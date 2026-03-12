@@ -117,6 +117,13 @@
   .search-box:focus { border-color: var(--green); box-shadow: 0 0 5px var(--green-glow); }
   .search-box::placeholder { color: var(--green-dark); }
 
+  .num-input {
+    background: var(--bg); border: 1px solid var(--green-dark);
+    color: var(--green); font-family: var(--font); font-size: 11px;
+    padding: 2px 6px; width: 70px; outline: none; text-align: right;
+  }
+  .num-input:focus { border-color: var(--green); box-shadow: 0 0 5px var(--green-glow); }
+
   .sep { color: var(--green-dark); margin: 0 3px; }
 
   .stats { margin-left: auto; font-size: 11px; color: var(--green-dim); display: flex; gap: 12px; align-items: center; }
@@ -244,6 +251,14 @@
     <span class="sep">|</span>
     <input type="text" class="search-box" id="search" placeholder="> search...">
 
+    <span class="sep arb-filter" style="display:none;">|</span>
+    <span class="ctrl-label arb-filter" style="display:none;">MIN VOL $</span>
+    <input type="number" class="num-input arb-filter" id="arbMinVol" value="10000" min="0" step="1000" style="display:none;">
+
+    <span class="sep arb-filter" style="display:none;">|</span>
+    <span class="ctrl-label arb-filter" style="display:none;">MIN PROFIT %</span>
+    <input type="number" class="num-input arb-filter" id="arbMinProfit" value="0" min="0" step="0.1" style="display:none; width:55px;">
+
     <div class="stats">
       <div id="statsLabel">PAIRS:</div>
       <div><span id="pairCount">0</span></div>
@@ -329,6 +344,8 @@
   // Arb filters (multi-select: empty array = ALL)
   let arbExchangeFilter = [];
   let arbQuoteFilter = 'ALL';
+  let arbMinVol = 10000;
+  let arbMinProfit = 0;
 
   // Shared
   let searchTerm = '';
@@ -359,6 +376,9 @@
   const $pageInfo = $('pageInfo');
   const $prevPage = $('prevPage');
   const $nextPage = $('nextPage');
+  const $arbMinVol = $('arbMinVol');
+  const $arbMinProfit = $('arbMinProfit');
+  const $arbFilters = document.querySelectorAll('.arb-filter');
 
   // --- Formatters ---
   function fP(v) {
@@ -489,8 +509,9 @@
       b.classList.toggle('active', b.dataset.view === view);
     });
 
-    // Show/hide tables
-    if (view === 'arbitrage') {
+    // Show/hide tables + arb-specific filters
+    const isArb = view === 'arbitrage';
+    if (isArb) {
       $table.style.display = 'none';
       $arbTable.style.display = '';
       $statsLabel.textContent = 'OPPS:';
@@ -499,6 +520,7 @@
       $table.style.display = '';
       $statsLabel.textContent = 'PAIRS:';
     }
+    $arbFilters.forEach(el => { el.style.display = isArb ? '' : 'none'; });
 
     // Reset pagination
     page = 0;
@@ -633,6 +655,15 @@
   function renderArb() {
     let data = allArb;
 
+    // Client-side liquidity/profit filters
+    if (arbMinVol > 0 || arbMinProfit > 0) {
+      data = data.filter(o => {
+        if (arbMinVol > 0 && (o.bv < arbMinVol || o.av < arbMinVol)) return false;
+        if (arbMinProfit > 0 && o.pf < arbMinProfit) return false;
+        return true;
+      });
+    }
+
     if (searchTerm) {
       const s = searchTerm.toUpperCase();
       data = data.filter(o => o.s.includes(s) || o.b.includes(s));
@@ -722,6 +753,18 @@
       page = 0;
       activeRender();
     }, 150);
+  });
+
+  // --- Arb Filter Inputs ---
+  $arbMinVol.addEventListener('input', () => {
+    arbMinVol = parseFloat($arbMinVol.value) || 0;
+    page = 0;
+    renderArb();
+  });
+  $arbMinProfit.addEventListener('input', () => {
+    arbMinProfit = parseFloat($arbMinProfit.value) || 0;
+    page = 0;
+    renderArb();
   });
 
   // --- Column Sort ---

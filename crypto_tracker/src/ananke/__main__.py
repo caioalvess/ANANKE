@@ -237,7 +237,7 @@ async def run_web(config: AppConfig) -> None:
         await manager.disconnect_all()
         return
 
-    runner = await start_web(manager, config.web)
+    runner = await start_web(manager, config.web, config.arbitrage)
     print(f"\n  Web UI: http://{config.web.host}:{config.web.port}")
     print(f"  {manager.total_symbols()} spot pairs across {len(manager.exchange_names)} exchanges")
     print("  Press Ctrl+C to stop.\n")

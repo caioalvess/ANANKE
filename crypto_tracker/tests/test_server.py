@@ -1,6 +1,7 @@
 """Tests for web server filtering and arbitrage logic."""
 
 from ananke.coin_registry import CoinRegistry
+from ananke.config import ArbitrageConfig
 from ananke.fee_registry import FeeRegistry
 from ananke.models import Ticker
 from ananke.web.server import (
@@ -630,3 +631,116 @@ def test_can_execute_arb_method() -> None:
     assert fees.can_execute_arb("Binance", "Gate.io", "DIN")  # ask side, irrelevant
     # BTC — no blocks
     assert fees.can_execute_arb("Binance", "KuCoin", "BTC")
+
+
+# --- Arbitrage quality filters (ArbitrageConfig) ---
+
+
+def test_arb_min_volume_filters_low_liquidity() -> None:
+    """Tickers with low volume are excluded before grouping."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=12),
+    ]
+    cfg = ArbitrageConfig(min_volume_quote=10_000)
+    result = _compute_arbitrage(tickers, arb_config=cfg)
+    # Kraken side has only $12 volume → excluded → no arb
+    assert len(result) == 0
+
+
+def test_arb_min_volume_both_sides_pass() -> None:
+    """Both sides above min volume → arb passes."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=20_000),
+    ]
+    cfg = ArbitrageConfig(min_volume_quote=10_000)
+    result = _compute_arbitrage(tickers, arb_config=cfg)
+    assert len(result) == 1
+
+
+def test_arb_max_spread_filters_illiquid_pair() -> None:
+    """Pair with wide bid-ask spread is excluded as illiquid."""
+    # Spread = (105 - 100) / 100 = 5%
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=110.0, ask=110.5),
+        _make_ticker("BTCUSDT", "Kraken", bid=100.0, ask=105.0),
+    ]
+    cfg = ArbitrageConfig(max_pair_spread_pct=3.0)
+    result = _compute_arbitrage(tickers, arb_config=cfg)
+    # Kraken spread 5% > max 3% → excluded → no arb
+    assert len(result) == 0
+
+
+def test_arb_max_spread_tight_pairs_pass() -> None:
+    """Pairs with tight spread pass the filter."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=50_000),
+    ]
+    cfg = ArbitrageConfig(max_pair_spread_pct=5.0)
+    result = _compute_arbitrage(tickers, arb_config=cfg)
+    assert len(result) == 1
+
+
+def test_arb_min_profit_filters_low_profit() -> None:
+    """Opportunities below min profit threshold are excluded."""
+    # profit = (100 - 99) / 99 * 100 ≈ 1.01%
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=50_000),
+    ]
+    cfg = ArbitrageConfig(min_profit_pct=2.0)
+    result = _compute_arbitrage(tickers, arb_config=cfg)
+    assert len(result) == 0
+
+
+def test_arb_min_profit_high_profit_passes() -> None:
+    """Opportunities above min profit threshold pass."""
+    # profit = (105 - 99) / 99 * 100 ≈ 6.06%
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=105.0, ask=105.5, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=50_000),
+    ]
+    cfg = ArbitrageConfig(min_profit_pct=5.0)
+    result = _compute_arbitrage(tickers, arb_config=cfg)
+    assert len(result) == 1
+    assert result[0]["pf"] > 5.0
+
+
+def test_arb_no_config_no_filtering() -> None:
+    """Without ArbitrageConfig, no quality filters applied (backward compat)."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=5),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=5),
+    ]
+    # No arb_config → default behavior, $5 volume passes
+    result = _compute_arbitrage(tickers)
+    assert len(result) == 1
+
+
+def test_arb_default_config_filters_low_volume() -> None:
+    """Default ArbitrageConfig (min_volume=10K) filters low-vol pairs."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=5),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=5),
+    ]
+    cfg = ArbitrageConfig()  # defaults: min_volume=10K, max_spread=5%
+    result = _compute_arbitrage(tickers, arb_config=cfg)
+    assert len(result) == 0
+
+
+def test_arb_combined_filters() -> None:
+    """Multiple filters applied together."""
+    tickers = [
+        # Good: high vol, tight spread, profitable
+        _make_ticker("BTCUSDT", "Binance", bid=105.0, ask=105.5, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=30_000),
+        # Bad: low volume on Kraken side
+        _make_ticker("ETHUSDT", "Binance", bid=3010.0, ask=3015.0, volume_quote=50_000),
+        _make_ticker("ETHUSDT", "Kraken", bid=2990.0, ask=3000.0, volume_quote=500),
+    ]
+    cfg = ArbitrageConfig(min_volume_quote=10_000, min_profit_pct=1.0)
+    result = _compute_arbitrage(tickers, arb_config=cfg)
+    assert len(result) == 1
+    assert result[0]["b"] == "BTC"

@@ -1925,3 +1925,26 @@ Traceback (most recent call last):
     raise asyncio.TimeoutError from exc_val
 TimeoutError
 2026-03-12 18:55:47,446 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 20:10:50,471 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3bb5c355d0>
+2026-03-12 20:10:50,471 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3bb571ded0>
+2026-03-12 20:10:50,471 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3bb571ead0>
+2026-03-12 20:10:50,471 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3bb58e3150>, 123517.203399963)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f3bb571eb10>
+2026-03-12 20:10:50,471 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3bb571f590>
+2026-03-12 20:10:50,471 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3bb5760360>, 123518.344058548)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f3bb571f610>
+2026-03-12 20:10:50,472 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3bb5738250>
+2026-03-12 20:10:50,472 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3bb571d350>
+2026-03-12 20:10:50,472 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3bb57603d0>, 123518.202603223)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f3bb571d390>
+2026-03-12 20:10:50,472 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-26' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>

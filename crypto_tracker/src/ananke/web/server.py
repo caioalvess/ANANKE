@@ -17,7 +17,7 @@ from aiohttp import web
 from aiohttp.web_ws import WebSocketResponse
 
 from ananke.coin_registry import CoinRegistry, build_registry
-from ananke.config import WebConfig
+from ananke.config import ArbitrageConfig, WebConfig
 from ananke.exchanges.manager import ExchangeManager
 from ananke.fee_registry import FeeRegistry, build_fee_registry
 from ananke.models import Ticker
@@ -88,6 +88,7 @@ def _compute_arbitrage(
     all_tickers: list[Ticker],
     registry: CoinRegistry | None = None,
     fees: FeeRegistry | None = None,
+    arb_config: ArbitrageConfig | None = None,
 ) -> list[dict[str, str | float]]:
     """
     Single-pass O(n) scan: group tickers by canonical identity + quote,
@@ -101,9 +102,17 @@ def _compute_arbitrage(
     """
     best: dict[tuple[str, str], dict[str, str | float | bool]] = {}
     has_registry = registry is not None and registry.has_data()
+    min_vol = arb_config.min_volume_quote if arb_config else 0.0
+    max_spread = arb_config.max_pair_spread_pct / 100 if arb_config else 0.0
+    min_profit = arb_config.min_profit_pct if arb_config else 0.0
 
     for t in all_tickers:
         if t.bid <= 0 or t.ask <= 0:
+            continue
+        # Pre-grouping liquidity filters
+        if min_vol > 0 and t.volume_quote < min_vol:
+            continue
+        if max_spread > 0 and (t.ask - t.bid) / t.bid > max_spread:
             continue
 
         if has_registry:
@@ -161,6 +170,9 @@ def _compute_arbitrage(
         bid = entry["max_bid"]
         ask = entry["min_ask"]
         profit = (bid - ask) / ask * 100
+
+        if min_profit > 0 and profit < min_profit:
+            continue
 
         # Net profit after taker fees + withdrawal cost in quote
         if fees:
@@ -296,6 +308,7 @@ async def _broadcast_loop(app: web.Application) -> None:
     config: WebConfig = app["web_config"]
     registry: CoinRegistry = app["coin_registry"]
     fees: FeeRegistry = app["fee_registry"]
+    arb_config: ArbitrageConfig = app["arb_config"]
 
     while True:
         if clients and manager.has_data():
@@ -336,7 +349,9 @@ async def _broadcast_loop(app: web.Application) -> None:
 
             # --- Arbitrage broadcasts (compute once, filter per group) ---
             if arb_groups:
-                arb_all = _compute_arbitrage(all_tickers, registry, fees)
+                arb_all = _compute_arbitrage(
+                    all_tickers, registry, fees, arb_config,
+                )
 
                 for (arb_exs, arb_q), group_clients in arb_groups.items():
                     filtered = _filter_arbitrage(arb_all, list(arb_exs), arb_q)
@@ -378,9 +393,11 @@ async def _on_cleanup(app: web.Application) -> None:
 async def start_web(
     manager: ExchangeManager,
     config: WebConfig | None = None,
+    arb_config: ArbitrageConfig | None = None,
 ) -> web.AppRunner:
     """Create and start the aiohttp web server."""
     config = config or WebConfig()
+    arb_config = arb_config or ArbitrageConfig()
 
     registry = await build_registry()
     fees = await build_fee_registry()
@@ -389,6 +406,7 @@ async def start_web(
     app["manager"] = manager
     app["clients"] = {}
     app["web_config"] = config
+    app["arb_config"] = arb_config
     app["coin_registry"] = registry
     app["fee_registry"] = fees
     app.on_startup.append(_on_startup)

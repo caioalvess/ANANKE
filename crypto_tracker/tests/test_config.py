@@ -4,6 +4,7 @@ import pytest
 
 from ananke.config import (
     AppConfig,
+    ArbitrageConfig,
     BinanceConfig,
     BybitConfig,
     KrakenConfig,
@@ -69,3 +70,26 @@ def test_env_float_valid(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_env_float_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TEST_FLOAT", "abc")
     assert _env_float("TEST_FLOAT", 1.5) == 1.5
+
+
+def test_arbitrage_config_defaults() -> None:
+    cfg = ArbitrageConfig()
+    assert cfg.min_volume_quote == 10_000.0
+    assert cfg.max_pair_spread_pct == 5.0
+    assert cfg.min_profit_pct == 0.0
+
+
+def test_arbitrage_config_in_app_config() -> None:
+    cfg = AppConfig()
+    assert isinstance(cfg.arbitrage, ArbitrageConfig)
+    assert cfg.arbitrage.min_volume_quote == 10_000.0
+
+
+def test_arbitrage_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANANKE_ARB_MIN_VOLUME", "25000")
+    monkeypatch.setenv("ANANKE_ARB_MAX_SPREAD", "3.5")
+    monkeypatch.setenv("ANANKE_ARB_MIN_PROFIT", "0.5")
+    cfg = load_config()
+    assert cfg.arbitrage.min_volume_quote == 25000.0
+    assert cfg.arbitrage.max_pair_spread_pct == 3.5
+    assert cfg.arbitrage.min_profit_pct == 0.5

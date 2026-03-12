@@ -63,6 +63,15 @@ class GateioConfig:
 
 
 @dataclass(frozen=True)
+class ArbitrageConfig:
+    """Arbitrage quality filters — reject noise before it reaches the UI."""
+
+    min_volume_quote: float = 10_000.0   # min 24h volume in quote per side
+    max_pair_spread_pct: float = 5.0     # max bid-ask spread % per individual pair
+    min_profit_pct: float = 0.0          # min gross profit % to include (0 = all)
+
+
+@dataclass(frozen=True)
 class WebConfig:
     """Web server settings."""
 
@@ -91,6 +100,7 @@ class AppConfig:
     kucoin: KucoinConfig = field(default_factory=KucoinConfig)
     gateio: GateioConfig = field(default_factory=GateioConfig)
     enabled_exchanges: tuple[str, ...] = ("binance", "bybit", "okx", "kraken", "kucoin", "gateio")
+    arbitrage: ArbitrageConfig = field(default_factory=ArbitrageConfig)
     web: WebConfig = field(default_factory=WebConfig)
     display: DisplayConfig = field(default_factory=DisplayConfig)
     log_level: str = "WARNING"
@@ -173,6 +183,17 @@ def load_config() -> AppConfig:
         ),
         enabled_exchanges=tuple(
             name.strip() for name in enabled_raw.split(",") if name.strip()
+        ),
+        arbitrage=ArbitrageConfig(
+            min_volume_quote=_env_float(
+                "ANANKE_ARB_MIN_VOLUME", ArbitrageConfig.min_volume_quote,
+            ),
+            max_pair_spread_pct=_env_float(
+                "ANANKE_ARB_MAX_SPREAD", ArbitrageConfig.max_pair_spread_pct,
+            ),
+            min_profit_pct=_env_float(
+                "ANANKE_ARB_MIN_PROFIT", ArbitrageConfig.min_profit_pct,
+            ),
         ),
         web=WebConfig(
             host=_env("ANANKE_WEB_HOST", web_d.host),
