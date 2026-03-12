@@ -171,6 +171,15 @@
   .mag { color: var(--magenta); }
   .ylw { color: var(--yellow); }
   .ex-tag { color: var(--cyan); }
+  a.ex-link {
+    color: var(--cyan); text-decoration: none;
+    border-bottom: 1px dotted var(--green-dark);
+    transition: border-color 0.15s, text-shadow 0.15s;
+  }
+  a.ex-link:hover {
+    border-bottom-color: var(--cyan);
+    text-shadow: 0 0 6px rgba(0,229,255,0.3);
+  }
 
   .footer {
     padding: 4px 16px; border-top: 1px solid var(--border);
@@ -311,6 +320,7 @@
   let allArb = [];
   let activeExchanges = [];
   let prevPrices = {};
+  let prevArbProfits = {};
 
   // Ticker filters
   let exchangeFilter = '';
@@ -366,6 +376,20 @@
     return v.toFixed(2);
   }
   function fC(v) { return (v>0?'+':'')+v.toFixed(2)+'%'; }
+  function tradeUrl(ex, base, quote) {
+    const b=base.toUpperCase(), q=quote.toUpperCase(), bl=base.toLowerCase(), ql=quote.toLowerCase();
+    switch(ex) {
+      case 'Binance': return 'https://www.binance.com/en/trade/'+b+'_'+q;
+      case 'Bybit':   return 'https://www.bybit.com/trade/spot/'+b+'/'+q;
+      case 'OKX':     return 'https://www.okx.com/trade-spot/'+bl+'-'+ql;
+      case 'Kraken':  return 'https://pro.kraken.com/app/trade/'+bl+'-'+ql;
+      case 'KuCoin':  return 'https://www.kucoin.com/trade/'+b+'-'+q;
+      default: return '#';
+    }
+  }
+  function exLink(ex, base, quote) {
+    return '<a class="ex-link" href="'+tradeUrl(ex,base,quote)+'" target="_blank" rel="noopener">'+ex+'</a>';
+  }
   function fI(v) { return v ? v.toLocaleString('en-US') : '\u2014'; }
   function cc(v) { return v>0?'pos':v<0?'neg':'dim'; }
 
@@ -631,30 +655,37 @@
     const start = page * PAGE_SIZE;
     const pageData = data.slice(start, start + PAGE_SIZE);
 
+    const newPrevArb = {};
     const buf = new Array(pageData.length);
     for (let i=0; i<pageData.length; i++) {
       const o = pageData[i];
+      const key = o.s+'_'+o.bx+'_'+o.ax;
+      const prev = prevArbProfits[key];
+      let fc = '';
+      if (prev !== undefined && prev !== o.npf) fc = o.npf>prev?'flash-up':'flash-down';
+      newPrevArb[key] = o.npf;
       const gi = start + i + 1;
       const pfClass = o.pf >= 0.5 ? 'ylw' : o.pf >= 0.1 ? 'pos' : 'dim';
       const npfClass = o.npf > 0 ? (o.npf >= 0.5 ? 'ylw' : 'pos') : o.npf < 0 ? 'neg' : 'dim';
       const wfStr = o.wf > 0 ? '~'+fP(o.wf) : '\u2014';
 
       buf[i] =
-        '<tr>'+
+        '<tr class="'+fc+'">'+
         '<td>'+gi+'</td>'+
         '<td class="pair-cell"><span class="pair-base">'+o.b+'</span><span class="pair-quote">/'+o.q+'</span></td>'+
         '<td class="'+pfClass+'">'+o.pf.toFixed(3)+'%</td>'+
         '<td class="'+npfClass+'">'+o.npf.toFixed(3)+'%</td>'+
         '<td>'+wfStr+'</td>'+
         '<td>'+fP(o.ak)+'</td>'+
-        '<td class="ex-tag">'+o.ax+'</td>'+
+        '<td class="ex-tag">'+exLink(o.ax,o.b,o.q)+'</td>'+
         '<td>'+fP(o.bi)+'</td>'+
-        '<td class="ex-tag">'+o.bx+'</td>'+
+        '<td class="ex-tag">'+exLink(o.bx,o.b,o.q)+'</td>'+
         '<td>'+fV(o.av)+'</td>'+
         '<td>'+fV(o.bv)+'</td>'+
         '</tr>';
     }
     $arbTbody.innerHTML = buf.join('');
+    prevArbProfits = newPrevArb;
   }
 
   // --- View Toggle ---

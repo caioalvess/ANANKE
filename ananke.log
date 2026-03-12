@@ -1176,3 +1176,291 @@ Traceback (most recent call last):
   File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/helpers.py", line 713, in __exit__
     raise asyncio.TimeoutError from exc_val
 TimeoutError
+2026-03-12 16:03:00,605 [aiohttp.server] ERROR: Unhandled exception
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 640, in run_until_complete
+    self.run_forever()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 607, in run_forever
+    self._run_once()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 1884, in _run_once
+    event_list = self._selector.select(timeout)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/selectors.py", line 468, in select
+    fd_event_list = self._selector.poll(timeout, max_ev)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 510, in _handle_request
+    resp = await request_handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_app.py", line 569, in _handle
+    return await handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/dados/ANANKE/crypto_tracker/src/ananke/web/server.py", line 244, in _ws_handler
+    async for msg in ws:
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_ws.py", line 620, in __anext__
+    msg = await self.receive()
+          ^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_ws.py", line 545, in receive
+    msg = await self._reader.read()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "aiohttp/_websocket/reader_c.py", line 118, in read
+  File "aiohttp/_websocket/reader_c.py", line 115, in aiohttp._websocket.reader_c.WebSocketDataQueue.read
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 602, in start
+    resp, reset = await task
+                  ^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 539, in _handle_request
+    self._handler_waiter.set_result(None)
+asyncio.exceptions.InvalidStateError: invalid state
+2026-03-12 16:03:00,722 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f1db3f1ab50>
+2026-03-12 16:03:00,722 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f1db3f1a350>
+2026-03-12 16:03:00,722 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f1db3f1b590>
+2026-03-12 16:03:00,722 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f1db40e79a0>, 108647.41887225)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f1db3f1a9d0>
+2026-03-12 16:03:00,722 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f1db4521050>
+2026-03-12 16:03:00,722 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f1db40e7a80>, 108646.897881347)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f1db3f20c90>
+2026-03-12 16:03:00,722 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f1db3f201d0>
+2026-03-12 16:03:00,722 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f1db40e7700>, 108648.191846497)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f1db3f20210>
+2026-03-12 16:03:00,723 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-21' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-12 16:04:00,923 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:04:40,155 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:13:19,134 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:17:38,576 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:19:17,585 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:20:16,896 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:20:56,139 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:24:20,442 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:24:33,446 [ananke.exchanges.binance] WARNING: Binance WS disconnected: timed out during opening handshake — reconnecting in 3s
+2026-03-12 16:24:46,449 [ananke.exchanges.binance] WARNING: Binance WS disconnected: timed out during opening handshake — reconnecting in 3s
+2026-03-12 16:24:59,453 [ananke.exchanges.binance] WARNING: Binance WS disconnected: timed out during opening handshake — reconnecting in 3s
+2026-03-12 16:27:18,724 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:31:18,210 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:33:37,509 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:33:50,511 [ananke.exchanges.binance] WARNING: Binance WS disconnected: timed out during opening handshake — reconnecting in 3s
+2026-03-12 16:34:03,515 [ananke.exchanges.binance] WARNING: Binance WS disconnected: timed out during opening handshake — reconnecting in 3s
+2026-03-12 16:34:16,517 [ananke.exchanges.binance] WARNING: Binance WS disconnected: timed out during opening handshake — reconnecting in 3s
+2026-03-12 16:35:02,935 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:35:15,938 [ananke.exchanges.binance] WARNING: Binance WS disconnected: timed out during opening handshake — reconnecting in 3s
+2026-03-12 16:35:28,940 [ananke.exchanges.binance] WARNING: Binance WS disconnected: timed out during opening handshake — reconnecting in 3s
+2026-03-12 16:35:41,942 [ananke.exchanges.binance] WARNING: Binance WS disconnected: timed out during opening handshake — reconnecting in 3s
+2026-03-12 16:36:25,917 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:37:05,216 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:37:18,218 [ananke.exchanges.binance] WARNING: Binance WS disconnected: timed out during opening handshake — reconnecting in 3s
+2026-03-12 16:38:02,561 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:38:49,614 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:39:35,842 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:40:14,772 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:41:18,766 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:42:04,334 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:46:23,862 [ananke.exchanges.binance] WARNING: Binance WS disconnected: sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-03-12 16:47:09,741 [aiohttp.server] ERROR: Unhandled exception
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 640, in run_until_complete
+    self.run_forever()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 607, in run_forever
+    self._run_once()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 1884, in _run_once
+    event_list = self._selector.select(timeout)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/selectors.py", line 468, in select
+    fd_event_list = self._selector.poll(timeout, max_ev)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 510, in _handle_request
+    resp = await request_handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_app.py", line 569, in _handle
+    return await handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/dados/ANANKE/crypto_tracker/src/ananke/web/server.py", line 244, in _ws_handler
+    async for msg in ws:
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_ws.py", line 620, in __anext__
+    msg = await self.receive()
+          ^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_ws.py", line 545, in receive
+    msg = await self._reader.read()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "aiohttp/_websocket/reader_c.py", line 118, in read
+  File "aiohttp/_websocket/reader_c.py", line 115, in aiohttp._websocket.reader_c.WebSocketDataQueue.read
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 602, in start
+    resp, reset = await task
+                  ^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 539, in _handle_request
+    self._handler_waiter.set_result(None)
+asyncio.exceptions.InvalidStateError: invalid state
+2026-03-12 16:47:09,872 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fe9deb0add0>
+2026-03-12 16:47:09,872 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fe9deb0ac50>
+2026-03-12 16:47:09,872 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fe9deb0b850>
+2026-03-12 16:47:09,872 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fe9de918f10>
+2026-03-12 16:47:09,872 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fe9de918490>
+2026-03-12 16:47:09,873 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-21' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-12 16:47:09,873 [asyncio] ERROR: Task exception was never retrieved
+future: <Task finished name='Task-22' coro=<BybitExchange._poll_loop() done, defined at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/bybit.py:87> exception=TimeoutError()>
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 371, in _wait
+    await waiter
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/dados/ANANKE/crypto_tracker/src/ananke/exchanges/bybit.py", line 91, in _poll_loop
+    await self._fetch_tickers()
+  File "/dados/ANANKE/crypto_tracker/src/ananke/exchanges/bybit.py", line 106, in _fetch_tickers
+    data = await resp.json()
+           ^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 751, in json
+    await self.read()
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 693, in read
+    self._body = await self.content.read()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 442, in read
+    block = await self.readany()
+            ^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 464, in readany
+    await self._wait("readany")
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 370, in _wait
+    with self._timer:
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/helpers.py", line 713, in __exit__
+    raise asyncio.TimeoutError from exc_val
+TimeoutError
+2026-03-12 16:47:09,874 [asyncio] ERROR: Task exception was never retrieved
+future: <Task finished name='Task-23' coro=<OkxExchange._poll_loop() done, defined at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/okx.py:75> exception=TimeoutError()>
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 371, in _wait
+    await waiter
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/dados/ANANKE/crypto_tracker/src/ananke/exchanges/okx.py", line 79, in _poll_loop
+    await self._fetch_tickers()
+  File "/dados/ANANKE/crypto_tracker/src/ananke/exchanges/okx.py", line 94, in _fetch_tickers
+    data = await resp.json()
+           ^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 751, in json
+    await self.read()
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 693, in read
+    self._body = await self.content.read()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 442, in read
+    block = await self.readany()
+            ^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 464, in readany
+    await self._wait("readany")
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 370, in _wait
+    with self._timer:
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/helpers.py", line 713, in __exit__
+    raise asyncio.TimeoutError from exc_val
+TimeoutError
+2026-03-12 16:47:09,875 [asyncio] ERROR: Task exception was never retrieved
+future: <Task finished name='Task-24' coro=<KrakenExchange._poll_loop() done, defined at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py:127> exception=TimeoutError()>
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 371, in _wait
+    await waiter
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py", line 131, in _poll_loop
+    await self._fetch_tickers()
+  File "/dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py", line 146, in _fetch_tickers
+    data = await resp.json()
+           ^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 751, in json
+    await self.read()
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 693, in read
+    self._body = await self.content.read()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 442, in read
+    block = await self.readany()
+            ^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 464, in readany
+    await self._wait("readany")
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 370, in _wait
+    with self._timer:
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/helpers.py", line 713, in __exit__
+    raise asyncio.TimeoutError from exc_val
+TimeoutError
+2026-03-12 16:47:09,875 [asyncio] ERROR: Task exception was never retrieved
+future: <Task finished name='Task-25' coro=<KucoinExchange._poll_loop() done, defined at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kucoin.py:80> exception=TimeoutError()>
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 371, in _wait
+    await waiter
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/dados/ANANKE/crypto_tracker/src/ananke/exchanges/kucoin.py", line 84, in _poll_loop
+    await self._fetch_tickers()
+  File "/dados/ANANKE/crypto_tracker/src/ananke/exchanges/kucoin.py", line 99, in _fetch_tickers
+    data = await resp.json()
+           ^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 751, in json
+    await self.read()
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 693, in read
+    self._body = await self.content.read()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 442, in read
+    block = await self.readany()
+            ^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 464, in readany
+    await self._wait("readany")
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 370, in _wait
+    with self._timer:
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/helpers.py", line 713, in __exit__
+    raise asyncio.TimeoutError from exc_val
+TimeoutError
