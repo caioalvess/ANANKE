@@ -1,0 +1,459 @@
+"""Tests for web server filtering and arbitrage logic."""
+
+from ananke.coin_registry import CoinRegistry
+from ananke.fee_registry import FeeRegistry
+from ananke.models import Ticker
+from ananke.web.server import (
+    _compute_arbitrage,
+    _filter_arbitrage,
+    _filter_tickers,
+    _serialize_ticker,
+)
+
+
+def _make_ticker(
+    symbol: str,
+    exchange: str,
+    quote: str = "USDT",
+    bid: float = 0.0,
+    ask: float = 0.0,
+    volume_quote: float = 1000.0,
+    price: float = 100.0,
+) -> Ticker:
+    return Ticker(
+        symbol=symbol,
+        base_asset=symbol.replace(quote, ""),
+        quote_asset=quote,
+        price=price,
+        bid=bid,
+        ask=ask,
+        volume_quote=volume_quote,
+        exchange=exchange,
+    )
+
+
+# --- Ticker filter tests ---
+
+
+def test_serialize_ticker_keys() -> None:
+    t = _make_ticker("BTCUSDT", "Binance")
+    result = _serialize_ticker(t)
+    assert result["s"] == "BTCUSDT"
+    assert result["ex"] == "Binance"
+    assert "p" in result
+    assert "sp" in result
+
+
+def test_filter_by_exchange() -> None:
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance"),
+        _make_ticker("ETHUSDT", "Bybit"),
+    ]
+    result = _filter_tickers(tickers, "Binance", "USDT")
+    assert len(result) == 1
+    assert result[0]["s"] == "BTCUSDT"
+
+
+def test_filter_by_quote() -> None:
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", "USDT"),
+        _make_ticker("ETHBTC", "Binance", "BTC"),
+    ]
+    result = _filter_tickers(tickers, "Binance", "USDT")
+    assert len(result) == 1
+    assert result[0]["s"] == "BTCUSDT"
+
+
+def test_filter_all_quotes() -> None:
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", "USDT"),
+        _make_ticker("ETHBTC", "Binance", "BTC"),
+    ]
+    result = _filter_tickers(tickers, "Binance", "ALL")
+    assert len(result) == 2
+
+
+def test_filter_empty() -> None:
+    result = _filter_tickers([], "Binance", "USDT")
+    assert result == []
+
+
+# --- Arbitrage engine tests (no registry = graceful degradation) ---
+
+
+def test_arb_basic_opportunity() -> None:
+    """BTC on Binance bid=100, on Kraken ask=99 → profit ~1.01%."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0),
+    ]
+    result = _compute_arbitrage(tickers)
+    assert len(result) == 1
+    opp = result[0]
+    assert opp["b"] == "BTC"
+    assert opp["bx"] == "Binance"  # best bid
+    assert opp["ax"] == "Kraken"   # best ask
+    assert opp["bi"] == 100.0
+    assert opp["ak"] == 99.0
+    assert opp["pf"] > 0
+
+
+def test_arb_no_opportunity_same_exchange() -> None:
+    """Single exchange → no cross-exchange arb possible."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=99.0),
+    ]
+    result = _compute_arbitrage(tickers)
+    assert len(result) == 0
+
+
+def test_arb_no_profit() -> None:
+    """Best bid < best ask → no opportunity."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=99.0, ask=100.0),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.5, ask=99.5),
+    ]
+    result = _compute_arbitrage(tickers)
+    assert len(result) == 0
+
+
+def test_arb_skips_zero_bid_ask() -> None:
+    """Tickers with 0 bid or ask are excluded."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=0.0),
+        _make_ticker("BTCUSDT", "Kraken", bid=0.0, ask=99.0),
+    ]
+    result = _compute_arbitrage(tickers)
+    assert len(result) == 0
+
+
+def test_arb_multiple_exchanges() -> None:
+    """Best bid and ask picked correctly from 3 exchanges."""
+    tickers = [
+        _make_ticker("ETHUSDT", "Binance", bid=3000.0, ask=3005.0),
+        _make_ticker("ETHUSDT", "OKX", bid=2990.0, ask=2995.0),
+        _make_ticker("ETHUSDT", "Kraken", bid=3010.0, ask=3008.0),
+    ]
+    result = _compute_arbitrage(tickers)
+    assert len(result) == 1
+    opp = result[0]
+    # Best bid=3010 (Kraken), best ask=2995 (OKX)
+    assert opp["bx"] == "Kraken"
+    assert opp["ax"] == "OKX"
+    assert opp["bi"] == 3010.0
+    assert opp["ak"] == 2995.0
+
+
+def test_arb_different_quotes_separate() -> None:
+    """Same base but different quotes are separate opportunities."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", "USDT", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "Kraken", "USDT", bid=98.0, ask=99.0),
+        _make_ticker("BTCETH", "Binance", "ETH", bid=50.0, ask=50.5),
+        _make_ticker("BTCETH", "Kraken", "ETH", bid=48.0, ask=49.0),
+    ]
+    result = _compute_arbitrage(tickers)
+    assert len(result) == 2
+
+
+# --- Arbitrage with registry: global confirmation ---
+
+
+def _registry_with_globals() -> CoinRegistry:
+    """Registry where BTC, ETH, SOL are globally confirmed."""
+    return CoinRegistry(
+        global_confirmed={"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"},
+        kucoin_confirmed={},
+        ambiguous=frozenset({"U", "LIT", "LUNA"}),
+    )
+
+
+def test_arb_global_confirmed_matched() -> None:
+    """Globally confirmed symbol is matched across ALL exchanges."""
+    tickers = [
+        _make_ticker("ETHUSDT", "Binance", bid=3015.0, ask=3020.0),
+        _make_ticker("ETHUSDT", "OKX", bid=2990.0, ask=3000.0),
+    ]
+    result = _compute_arbitrage(tickers, registry=_registry_with_globals())
+    assert len(result) == 1
+    assert result[0]["pf"] == round((3015.0 - 3000.0) / 3000.0 * 100, 4)
+
+
+def test_arb_ambiguous_symbol_excluded() -> None:
+    """Ambiguous symbol is excluded on ALL exchanges."""
+    tickers = [
+        _make_ticker("UUSDT", "Binance", bid=0.9997, ask=1.0),
+        _make_ticker("UUSDT", "Bybit", bid=0.0008, ask=0.000871),
+    ]
+    result = _compute_arbitrage(tickers, registry=_registry_with_globals())
+    assert len(result) == 0
+
+
+def test_arb_unknown_symbol_excluded() -> None:
+    """Symbol not in registry at all (unknown) is excluded."""
+    tickers = [
+        _make_ticker("FAKUSDT", "Binance", bid=10.0, ask=10.5),
+        _make_ticker("FAKUSDT", "Kraken", bid=9.0, ask=9.5),
+    ]
+    result = _compute_arbitrage(tickers, registry=_registry_with_globals())
+    assert len(result) == 0
+
+
+def test_arb_large_profit_not_capped() -> None:
+    """Large arbitrage on confirmed symbol is never filtered."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=150.0, ask=155.0),
+        _make_ticker("BTCUSDT", "Kraken", bid=95.0, ask=100.0),
+    ]
+    result = _compute_arbitrage(tickers, registry=_registry_with_globals())
+    assert len(result) == 1
+    assert result[0]["pf"] == round((150.0 - 100.0) / 100.0 * 100, 4)  # 50%
+
+
+# --- Arbitrage with registry: KuCoin-specific confirmation ---
+
+
+def _registry_with_kucoin() -> CoinRegistry:
+    """Registry where LUNA is confirmed on KuCoin only (via fullName)."""
+    return CoinRegistry(
+        global_confirmed={"BTC": "bitcoin", "ETH": "ethereum"},
+        kucoin_confirmed={"LUNA": "terra-luna-2", "LIT": "litentry"},
+        ambiguous=frozenset({"LUNA", "LIT"}),
+    )
+
+
+def test_arb_kucoin_confirmed_not_on_other_exchanges() -> None:
+    """LUNA confirmed on KuCoin but NOT on Binance → no cross-exchange arb."""
+    tickers = [
+        _make_ticker("LUNAUSDT", "Binance", bid=1.50, ask=1.55),
+        _make_ticker("LUNAUSDT", "Bybit", bid=0.80, ask=0.85),
+    ]
+    # LUNA is ambiguous on Binance and Bybit (no fullName) → both excluded
+    result = _compute_arbitrage(tickers, registry=_registry_with_kucoin())
+    assert len(result) == 0
+
+
+def test_arb_kucoin_confirmed_kucoin_side_enters() -> None:
+    """LUNA on KuCoin resolves correctly, but Binance side is blocked."""
+    tickers = [
+        _make_ticker("LUNAUSDT", "KuCoin", bid=1.50, ask=1.55),
+        _make_ticker("LUNAUSDT", "Binance", bid=0.80, ask=0.85),
+    ]
+    # KuCoin LUNA → terra-luna-2 (confirmed). Binance LUNA → None (blocked).
+    # Only one side enters → no cross-exchange arb possible.
+    result = _compute_arbitrage(tickers, registry=_registry_with_kucoin())
+    assert len(result) == 0
+
+
+def test_arb_kucoin_to_kucoin_not_cross_exchange() -> None:
+    """Two KuCoin tickers with same kucoin-confirmed symbol — same exchange, no arb."""
+    tickers = [
+        _make_ticker("LUNAUSDT", "KuCoin", bid=1.50, ask=1.55),
+        _make_ticker("LUNAUSDT", "KuCoin", bid=0.80, ask=0.85),
+    ]
+    result = _compute_arbitrage(tickers, registry=_registry_with_kucoin())
+    assert len(result) == 0
+
+
+def test_arb_global_still_works_with_kucoin_registry() -> None:
+    """Globally confirmed symbols work across all exchanges even in mixed registry."""
+    tickers = [
+        _make_ticker("ETHUSDT", "Binance", bid=3015.0, ask=3020.0),
+        _make_ticker("ETHUSDT", "KuCoin", bid=2990.0, ask=3000.0),
+    ]
+    result = _compute_arbitrage(tickers, registry=_registry_with_kucoin())
+    assert len(result) == 1
+    assert result[0]["b"] == "ETH"
+
+
+# --- Graceful degradation ---
+
+
+def test_arb_empty_registry_matches_everything() -> None:
+    """Empty registry = CoinGecko was unavailable → all symbols allowed."""
+    tickers = [
+        _make_ticker("UUSDT", "Binance", bid=0.9997, ask=1.0),
+        _make_ticker("UUSDT", "Bybit", bid=0.0008, ask=0.000871),
+    ]
+    result = _compute_arbitrage(tickers, registry=CoinRegistry.empty())
+    assert len(result) == 1  # false positive, but registry was unavailable
+
+
+def test_arb_no_registry_matches_everything() -> None:
+    """No registry (None) = same as empty, all symbols allowed."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0),
+    ]
+    result = _compute_arbitrage(tickers, registry=None)
+    assert len(result) == 1
+
+
+def test_arb_only_ambiguous_registry_blocks() -> None:
+    """Registry with only ambiguous entries (no confirmed) still blocks."""
+    tickers = [
+        _make_ticker("UUSDT", "Binance", bid=0.9997, ask=1.0),
+        _make_ticker("UUSDT", "Bybit", bid=0.0008, ask=0.000871),
+    ]
+    registry = CoinRegistry(
+        global_confirmed={},
+        kucoin_confirmed={},
+        ambiguous=frozenset({"U"}),
+    )
+    result = _compute_arbitrage(tickers, registry=registry)
+    assert len(result) == 0
+
+
+# --- Arbitrage filter tests ---
+
+
+def test_filter_arb_by_quote() -> None:
+    arb = [
+        {"s": "BTCUSDT", "b": "BTC", "q": "USDT", "bx": "Binance", "ax": "Kraken",
+         "bi": 100, "ak": 99, "pf": 1.0, "bv": 1000, "av": 900},
+        {"s": "ETHBTC", "b": "ETH", "q": "BTC", "bx": "OKX", "ax": "Binance",
+         "bi": 0.05, "ak": 0.049, "pf": 2.0, "bv": 500, "av": 400},
+    ]
+    result = _filter_arbitrage(arb, "", "USDT")
+    assert len(result) == 1
+    assert result[0]["q"] == "USDT"
+
+
+def test_filter_arb_by_exchange() -> None:
+    arb = [
+        {"s": "BTCUSDT", "b": "BTC", "q": "USDT", "bx": "Binance", "ax": "Kraken",
+         "bi": 100, "ak": 99, "pf": 1.0, "bv": 1000, "av": 900},
+        {"s": "ETHUSDT", "b": "ETH", "q": "USDT", "bx": "OKX", "ax": "KuCoin",
+         "bi": 3000, "ak": 2990, "pf": 0.3, "bv": 500, "av": 400},
+    ]
+    # Filter to only show opps involving Binance
+    result = _filter_arbitrage(arb, "Binance", "ALL")
+    assert len(result) == 1
+    assert result[0]["bx"] == "Binance"
+
+
+def test_filter_arb_all() -> None:
+    arb = [
+        {"s": "BTCUSDT", "b": "BTC", "q": "USDT", "bx": "Binance", "ax": "Kraken",
+         "bi": 100, "ak": 99, "pf": 1.0, "bv": 1000, "av": 900},
+        {"s": "ETHBTC", "b": "ETH", "q": "BTC", "bx": "OKX", "ax": "Binance",
+         "bi": 0.05, "ak": 0.049, "pf": 2.0, "bv": 500, "av": 400},
+    ]
+    result = _filter_arbitrage(arb, "", "ALL")
+    assert len(result) == 2
+
+
+# --- Fee-adjusted arbitrage tests ---
+
+
+def _fee_registry() -> FeeRegistry:
+    """Fee registry with known taker fees and a BTC withdrawal fee."""
+    return FeeRegistry(
+        taker={"Binance": 0.001, "Kraken": 0.004, "OKX": 0.001, "KuCoin": 0.001},
+        withdrawal={"BTC": 0.0005, "ETH": 0.005},
+    )
+
+
+def test_arb_npf_less_than_pf() -> None:
+    """Net profit after taker fees is always less than gross profit."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0),
+    ]
+    result = _compute_arbitrage(tickers, fees=_fee_registry())
+    assert len(result) == 1
+    opp = result[0]
+    assert "npf" in opp
+    assert "wf" in opp
+    assert opp["npf"] < opp["pf"]
+
+
+def test_arb_npf_calculation_same_taker() -> None:
+    """Verify net profit calculation with equal taker fees on both sides."""
+    # Binance taker 0.1%, OKX taker 0.1%
+    # bid=1010, ask=1000
+    # gross = (1010-1000)/1000 * 100 = 1.0%
+    # buy_cost = 1000 * 1.001 = 1001
+    # sell_rev = 1010 * 0.999 = 1008.99
+    # net = (1008.99 - 1001) / 1001 * 100 = 0.7982%
+    tickers = [
+        _make_ticker("ETHUSDT", "Binance", bid=1010.0, ask=1015.0),
+        _make_ticker("ETHUSDT", "OKX", bid=1005.0, ask=1000.0),
+    ]
+    fees = _fee_registry()
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
+    opp = result[0]
+    expected_npf = fees.net_profit_after_taker(
+        bid=1010.0, ask=1000.0,
+        bid_exchange="Binance", ask_exchange="OKX",
+    )
+    assert opp["npf"] == round(expected_npf, 4)
+
+
+def test_arb_npf_with_kraken_higher_fee() -> None:
+    """Kraken's higher taker fee (0.4%) significantly reduces net profit."""
+    # Binance bid=100, Kraken ask=99
+    # gross = (100-99)/99 * 100 = 1.0101%
+    # buy_cost = 99 * 1.004 = 99.396 (Kraken 0.4%)
+    # sell_rev = 100 * 0.999 = 99.9 (Binance 0.1%)
+    # net = (99.9 - 99.396) / 99.396 * 100 = 0.5072%
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0),
+    ]
+    fees = _fee_registry()
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
+    opp = result[0]
+    # Sell on Binance (0.1%), buy on Kraken (0.4%)
+    assert opp["bx"] == "Binance"
+    assert opp["ax"] == "Kraken"
+    assert opp["npf"] < opp["pf"]
+    # Kraken's 0.4% should eat ~0.5% of the gross profit
+    assert opp["npf"] < opp["pf"] - 0.4
+
+
+def test_arb_wf_in_quote_currency() -> None:
+    """Withdrawal fee is expressed in quote currency (fee * bid price).
+
+    Uses bid because withdrawal fee = base units you can't sell,
+    and selling happens at bid price on the target exchange.
+    """
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=60100.0, ask=60200.0),
+        _make_ticker("BTCUSDT", "Kraken", bid=59800.0, ask=60000.0),
+    ]
+    fees = _fee_registry()
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
+    opp = result[0]
+    # BTC withdrawal fee = 0.0005 BTC, bid = 60100 (sell side)
+    # wf = 0.0005 * 60100 = 30.05
+    assert opp["wf"] == 30.05
+
+
+def test_arb_npf_negative_after_fees() -> None:
+    """Small gross profit can become negative after taker fees."""
+    # Tiny spread: bid=100.1, ask=100.0 → gross ~0.1%
+    # After 0.1% + 0.1% taker → net should be negative
+    tickers = [
+        _make_ticker("ETHUSDT", "Binance", bid=100.1, ask=100.2),
+        _make_ticker("ETHUSDT", "OKX", bid=99.9, ask=100.0),
+    ]
+    result = _compute_arbitrage(tickers, fees=_fee_registry())
+    assert len(result) == 1
+    assert result[0]["pf"] > 0   # gross is positive
+    assert result[0]["npf"] < 0  # net is negative after fees
+
+
+def test_arb_no_fees_npf_equals_pf() -> None:
+    """Without fee registry, npf equals pf."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0),
+    ]
+    result = _compute_arbitrage(tickers)
+    assert len(result) == 1
+    assert result[0]["npf"] == result[0]["pf"]
+    assert result[0]["wf"] == 0.0

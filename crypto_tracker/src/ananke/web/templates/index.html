@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANANKE // Crypto Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&display=swap');
+
+  :root {
+    --green: #00ff41;
+    --green-dim: #00aa2a;
+    --green-dark: #003b00;
+    --green-glow: rgba(0, 255, 65, 0.15);
+    --red: #ff0040;
+    --cyan: #00e5ff;
+    --yellow: #ffea00;
+    --magenta: #ff00ff;
+    --orange: #ff9100;
+    --bg: #0a0a0a;
+    --bg-row: #0d0d0d;
+    --bg-row-alt: #111111;
+    --bg-hover: #0a2a0a;
+    --border: #0a3a0a;
+    --font: 'Fira Code', 'Courier New', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: var(--font);
+    font-size: 12px;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  .header { padding: 8px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+
+  .logo {
+    font-size: 18px; font-weight: 700; letter-spacing: 4px;
+    text-shadow: 0 0 10px var(--green), 0 0 20px var(--green), 0 0 40px var(--green-dim);
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+  .logo-sub { font-size: 11px; letter-spacing: 1px; opacity: 0.5; }
+
+  @keyframes glow-pulse {
+    0%, 100% { text-shadow: 0 0 10px var(--green), 0 0 20px var(--green); }
+    50% { text-shadow: 0 0 15px var(--green), 0 0 30px var(--green), 0 0 50px var(--green-dim); }
+  }
+
+  .status-bar { display: flex; align-items: center; gap: 16px; font-size: 11px; color: var(--green-dim); }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--red); display: inline-block; margin-right: 4px;
+  }
+  .status-dot.connected {
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green), 0 0 12px var(--green-dim);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { box-shadow: 0 0 6px var(--green); }
+    50% { box-shadow: 0 0 10px var(--green), 0 0 20px var(--green-dim); }
+  }
+
+  .controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ctrl-label { color: var(--cyan); font-size: 10px; letter-spacing: 1px; margin-right: 2px; }
+
+  .filter-btn {
+    background: transparent; border: 1px solid var(--green-dark);
+    color: var(--green-dim); font-family: var(--font); font-size: 11px;
+    padding: 2px 8px; cursor: pointer; transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: var(--green-dim); color: var(--green); }
+  .filter-btn.active {
+    background: var(--green-dark); border-color: var(--green);
+    color: var(--green); text-shadow: 0 0 5px var(--green-glow);
+  }
+  .exchange-btn.active {
+    background: #001a33; border-color: var(--cyan);
+    color: var(--cyan); text-shadow: 0 0 5px rgba(0,229,255,0.2);
+  }
+  .view-btn.active {
+    background: #1a0033; border-color: var(--magenta);
+    color: var(--magenta); text-shadow: 0 0 5px rgba(255,0,255,0.2);
+  }
+
+  .search-box {
+    background: var(--bg); border: 1px solid var(--green-dark);
+    color: var(--green); font-family: var(--font); font-size: 11px;
+    padding: 2px 8px; width: 140px; outline: none;
+  }
+  .search-box:focus { border-color: var(--green); box-shadow: 0 0 5px var(--green-glow); }
+  .search-box::placeholder { color: var(--green-dark); }
+
+  .sep { color: var(--green-dark); margin: 0 3px; }
+
+  .stats { margin-left: auto; font-size: 11px; color: var(--green-dim); display: flex; gap: 12px; align-items: center; }
+  .stats span { color: var(--green); }
+
+  .pager-btn {
+    background: transparent; border: 1px solid var(--green-dark);
+    color: var(--green-dim); font-family: var(--font); font-size: 11px;
+    padding: 1px 6px; cursor: pointer;
+  }
+  .pager-btn:hover { border-color: var(--green); color: var(--green); }
+  .pager-btn:disabled { opacity: 0.3; cursor: default; }
+
+  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; }
+  .table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+  .table-wrap::-webkit-scrollbar-track { background: var(--bg); }
+  .table-wrap::-webkit-scrollbar-thumb { background: var(--green-dark); border-radius: 3px; }
+
+  table { width: 100%; border-collapse: collapse; min-width: 1400px; }
+  thead { position: sticky; top: 0; z-index: 10; }
+
+  th {
+    background: #0d1a0d; border-bottom: 1px solid var(--green-dark);
+    padding: 5px 8px; text-align: right; font-size: 10px; font-weight: 600;
+    color: var(--cyan); text-transform: uppercase; letter-spacing: 1px;
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  th:hover { color: var(--green); }
+  th.sorted { color: var(--yellow); }
+  th:first-child, th:nth-child(2) { text-align: left; }
+  th .sort-arrow { font-size: 9px; margin-left: 3px; opacity: 0.4; }
+  th.sorted .sort-arrow { opacity: 1; color: var(--yellow); }
+
+  tr { border-bottom: 1px solid #0a1a0a; }
+  tr:nth-child(even) { background: var(--bg-row-alt); }
+  tr:nth-child(odd) { background: var(--bg-row); }
+  tr:hover { background: var(--bg-hover); }
+
+  td {
+    padding: 3px 8px; text-align: right; white-space: nowrap;
+    font-size: 11.5px; font-variant-numeric: tabular-nums;
+  }
+  td:first-child { text-align: center; color: var(--green-dark); font-size: 10px; width: 40px; }
+
+  td.pair-cell { text-align: left; font-weight: 600; }
+  .pair-base { color: #fff; }
+  .pair-quote { color: var(--green-dark); font-weight: 400; }
+
+  .pos { color: var(--green); text-shadow: 0 0 4px var(--green-glow); }
+  .neg { color: var(--red); text-shadow: 0 0 4px rgba(255,0,64,0.15); }
+  .dim { color: #444; }
+  .mag { color: var(--magenta); }
+  .ylw { color: var(--yellow); }
+  .ex-tag { color: var(--cyan); }
+
+  .footer {
+    padding: 4px 16px; border-top: 1px solid var(--border);
+    font-size: 10px; color: var(--green-dark);
+    display: flex; justify-content: space-between; flex-shrink: 0;
+  }
+  .footer kbd {
+    background: #1a1a1a; border: 1px solid var(--green-dark);
+    padding: 1px 4px; border-radius: 2px; color: var(--green-dim);
+    font-family: var(--font); font-size: 10px;
+  }
+
+  .loading {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; font-size: 14px; color: var(--green-dim);
+    flex-direction: column; gap: 15px;
+  }
+  .loading-spinner {
+    width: 40px; height: 40px;
+    border: 2px solid var(--green-dark); border-top-color: var(--green);
+    border-radius: 50%; animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @keyframes flash-green { 0% { background: rgba(0,255,65,0.15); } 100% { background: transparent; } }
+  @keyframes flash-red { 0% { background: rgba(255,0,64,0.15); } 100% { background: transparent; } }
+  .flash-up { animation: flash-green 0.6s ease-out; }
+  .flash-down { animation: flash-red 0.6s ease-out; }
+
+  #arbTable { min-width: 1200px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="logo">/// ANANKE <span class="logo-sub">CRYPTO TRACKER</span></div>
+    <div class="status-bar">
+      <div><span class="status-dot" id="statusDot"></span> <span id="statusText">CONNECTING...</span></div>
+      <div id="clock">--:--:--</div>
+    </div>
+  </div>
+  <div class="controls">
+    <span class="ctrl-label">VIEW:</span>
+    <button class="filter-btn view-btn active" data-view="tickers">TICKERS</button>
+    <button class="filter-btn view-btn" data-view="arbitrage">ARBITRAGE</button>
+
+    <span class="sep">|</span>
+    <span class="ctrl-label">EXCHANGE:</span>
+    <div id="exchangeBtns" style="display:inline-flex;gap:4px;"></div>
+
+    <span class="sep">|</span>
+    <span class="ctrl-label">QUOTE:</span>
+    <div id="quoteBtns" style="display:inline-flex;gap:4px;">
+      <button class="filter-btn quote-btn active" data-q="USDT">USDT</button>
+      <button class="filter-btn quote-btn" data-q="BTC">BTC</button>
+      <button class="filter-btn quote-btn" data-q="ETH">ETH</button>
+      <button class="filter-btn quote-btn" data-q="USDC">USDC</button>
+      <button class="filter-btn quote-btn" data-q="ALL">ALL</button>
+    </div>
+
+    <span class="sep">|</span>
+    <input type="text" class="search-box" id="search" placeholder="> search...">
+
+    <div class="stats">
+      <div id="statsLabel">PAIRS:</div>
+      <div><span id="pairCount">0</span></div>
+      <div>
+        <button class="pager-btn" id="prevPage">&lt;</button>
+        <span id="pageInfo" style="margin:0 4px;">1/1</span>
+        <button class="pager-btn" id="nextPage">&gt;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="table-wrap" id="tableWrap">
+  <div class="loading" id="loading">
+    <div class="loading-spinner"></div>
+    <div>Connecting to ANANKE server...</div>
+    <div style="font-size:11px;color:#333;">Waiting for exchange data</div>
+  </div>
+  <table id="mainTable" style="display:none;">
+    <thead>
+      <tr>
+        <th data-key="idx" data-table="tick" style="width:40px;">#</th>
+        <th data-key="s" data-table="tick">PAR</th>
+        <th data-key="p" data-table="tick">PRECO<span class="sort-arrow">&darr;</span></th>
+        <th data-key="pp" data-table="tick">VAR 24h<span class="sort-arrow">&darr;</span></th>
+        <th data-key="pc" data-table="tick">VAR $<span class="sort-arrow">&darr;</span></th>
+        <th data-key="h" data-table="tick">HIGH 24h<span class="sort-arrow">&darr;</span></th>
+        <th data-key="l" data-table="tick">LOW 24h<span class="sort-arrow">&darr;</span></th>
+        <th data-key="am" data-table="tick">AMPLITUDE<span class="sort-arrow">&darr;</span></th>
+        <th data-key="vb" data-table="tick">VOL BASE<span class="sort-arrow">&darr;</span></th>
+        <th data-key="vq" data-table="tick" class="sorted">VOL QUOTE<span class="sort-arrow">&darr;</span></th>
+        <th data-key="bi" data-table="tick">BID<span class="sort-arrow">&darr;</span></th>
+        <th data-key="ak" data-table="tick">ASK<span class="sort-arrow">&darr;</span></th>
+        <th data-key="sp" data-table="tick">SPREAD<span class="sort-arrow">&darr;</span></th>
+        <th data-key="tc" data-table="tick">TRADES<span class="sort-arrow">&darr;</span></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <table id="arbTable" style="display:none;">
+    <thead>
+      <tr>
+        <th data-key="idx" data-table="arb" style="width:40px;">#</th>
+        <th data-key="s" data-table="arb">PAR</th>
+        <th data-key="pf" data-table="arb">PROFIT %<span class="sort-arrow">&darr;</span></th>
+        <th data-key="npf" data-table="arb" class="sorted">NET PROFIT %<span class="sort-arrow">&darr;</span></th>
+        <th data-key="wf" data-table="arb">TAXA ENVIO<span class="sort-arrow">&darr;</span></th>
+        <th data-key="ak" data-table="arb">COMPRA (ASK)<span class="sort-arrow">&darr;</span></th>
+        <th data-key="ax" data-table="arb">EXCHANGE COMPRA<span class="sort-arrow">&darr;</span></th>
+        <th data-key="bi" data-table="arb">VENDA (BID)<span class="sort-arrow">&darr;</span></th>
+        <th data-key="bx" data-table="arb">EXCHANGE VENDA<span class="sort-arrow">&darr;</span></th>
+        <th data-key="av" data-table="arb">VOL COMPRA<span class="sort-arrow">&darr;</span></th>
+        <th data-key="bv" data-table="arb">VOL VENDA<span class="sort-arrow">&darr;</span></th>
+      </tr>
+    </thead>
+    <tbody id="arbTbody"></tbody>
+  </table>
+</div>
+
+<div class="footer">
+  <div><kbd>/</kbd> Search &nbsp; <kbd>ESC</kbd> Clear &nbsp; <kbd>&larr;&rarr;</kbd> Pages</div>
+  <div>ANANKE v1.0 // Multi-Exchange Spot // Real-time</div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const PAGE_SIZE = 50;
+
+  // --- State ---
+  let currentView = 'tickers';
+  let allTickers = [];
+  let allArb = [];
+  let activeExchanges = [];
+  let prevPrices = {};
+
+  // Ticker filters
+  let exchangeFilter = '';
+  let quoteFilter = 'USDT';
+
+  // Arb filters
+  let arbExchangeFilter = '';
+  let arbQuoteFilter = 'ALL';
+
+  // Shared
+  let searchTerm = '';
+  let sortKey = 'vq';
+  let arbSortKey = 'npf';
+  let sortAsc = false;
+  let arbSortAsc = false;
+  let page = 0;
+  let totalPages = 1;
+  let ws = null;
+  let reconnectDelay = 1000;
+  let tabsRendered = false;
+
+  const $ = id => document.getElementById(id);
+  const $tbody = $('tbody');
+  const $arbTbody = $('arbTbody');
+  const $table = $('mainTable');
+  const $arbTable = $('arbTable');
+  const $loading = $('loading');
+  const $statusDot = $('statusDot');
+  const $statusText = $('statusText');
+  const $pairCount = $('pairCount');
+  const $statsLabel = $('statsLabel');
+  const $search = $('search');
+  const $clock = $('clock');
+  const $exBtns = $('exchangeBtns');
+  const $quoteBtns = $('quoteBtns');
+  const $pageInfo = $('pageInfo');
+  const $prevPage = $('prevPage');
+  const $nextPage = $('nextPage');
+
+  // --- Formatters ---
+  function fP(v) {
+    if (!v) return '\u2014';
+    if (v >= 1000) return v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    if (v >= 1) return v.toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:4});
+    if (v >= 0.01) return v.toFixed(6);
+    return v.toFixed(8);
+  }
+  function fV(v) {
+    if (!v) return '\u2014';
+    if (v >= 1e9) return (v/1e9).toFixed(2)+'B';
+    if (v >= 1e6) return (v/1e6).toFixed(2)+'M';
+    if (v >= 1e3) return (v/1e3).toFixed(2)+'K';
+    return v.toFixed(2);
+  }
+  function fC(v) { return (v>0?'+':'')+v.toFixed(2)+'%'; }
+  function fI(v) { return v ? v.toLocaleString('en-US') : '\u2014'; }
+  function cc(v) { return v>0?'pos':v<0?'neg':'dim'; }
+
+  // --- Clock ---
+  setInterval(() => {
+    $clock.textContent = new Date().toLocaleTimeString('pt-BR',{hour12:false});
+  }, 1000);
+
+  // --- Active sort/render based on view ---
+  function getSort() { return currentView === 'arbitrage' ? {key: arbSortKey, asc: arbSortAsc} : {key: sortKey, asc: sortAsc}; }
+  function activeRender() { currentView === 'arbitrage' ? renderArb() : renderTickers(); }
+
+  // --- Send filters to server ---
+  function sendFilters() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (currentView === 'tickers') {
+      ws.send(JSON.stringify({view:'tickers', exchange:exchangeFilter, quote:quoteFilter}));
+    } else {
+      ws.send(JSON.stringify({view:'arbitrage', arb_exchange:arbExchangeFilter, arb_quote:arbQuoteFilter}));
+    }
+  }
+
+  // --- Exchange Tabs ---
+  function renderTabs(exs) {
+    if (!Array.isArray(exs) || exs.length === 0) return;
+    if (tabsRendered && exs.length === activeExchanges.length) return;
+    tabsRendered = true;
+    activeExchanges = exs;
+    if (!exchangeFilter) exchangeFilter = exs[0];
+    rebuildExBtns();
+  }
+
+  function rebuildExBtns() {
+    const exs = activeExchanges;
+    const isArb = currentView === 'arbitrage';
+    const currentEx = isArb ? arbExchangeFilter : exchangeFilter;
+
+    let h = '';
+    if (isArb) {
+      h += '<button class="filter-btn exchange-btn'+(currentEx===''?' active':'')+'" data-ex="">ALL</button>';
+    }
+    for (let i = 0; i < exs.length; i++) {
+      const ex = exs[i];
+      h += '<button class="filter-btn exchange-btn'+(currentEx===ex?' active':'')+'" data-ex="'+ex+'">'+ex.toUpperCase()+'</button>';
+    }
+    $exBtns.innerHTML = h;
+    $exBtns.querySelectorAll('.exchange-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        $exBtns.querySelectorAll('.exchange-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        if (isArb) {
+          arbExchangeFilter = b.dataset.ex;
+        } else {
+          exchangeFilter = b.dataset.ex;
+        }
+        page = 0;
+        sendFilters();
+      });
+    });
+  }
+
+  function syncQuoteBtns() {
+    const q = currentView === 'arbitrage' ? arbQuoteFilter : quoteFilter;
+    $quoteBtns.querySelectorAll('.quote-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.q === q);
+    });
+  }
+
+  // --- View switching ---
+  function switchView(view) {
+    if (view === currentView) return;
+    currentView = view;
+
+    // Toggle view buttons
+    document.querySelectorAll('.view-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.view === view);
+    });
+
+    // Show/hide tables
+    if (view === 'arbitrage') {
+      $table.style.display = 'none';
+      $arbTable.style.display = '';
+      $statsLabel.textContent = 'OPPS:';
+    } else {
+      $arbTable.style.display = 'none';
+      $table.style.display = '';
+      $statsLabel.textContent = 'PAIRS:';
+    }
+
+    // Reset pagination
+    page = 0;
+    searchTerm = '';
+    $search.value = '';
+
+    // Rebuild exchange tabs (arb has ALL, tickers doesn't)
+    tabsRendered = false;
+    rebuildExBtns();
+    syncQuoteBtns();
+    sendFilters();
+  }
+
+  // --- WebSocket ---
+  function connect() {
+    const proto = location.protocol==='https:'?'wss':'ws';
+    ws = new WebSocket(proto+'://'+location.host+'/ws');
+
+    ws.onopen = () => {
+      $statusDot.classList.add('connected');
+      $statusText.textContent = 'ONLINE';
+      reconnectDelay = 1000;
+    };
+    ws.onclose = () => {
+      $statusDot.classList.remove('connected');
+      $statusText.textContent = 'RECONNECTING...';
+      setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay*1.5, 10000);
+    };
+    ws.onerror = () => ws.close();
+
+    ws.onmessage = (e) => {
+      let msg;
+      try { msg = JSON.parse(e.data); } catch(err) { return; }
+
+      renderTabs(msg.exchanges);
+
+      if ($loading.style.display !== 'none') {
+        $loading.style.display = 'none';
+      }
+
+      if (msg.view === 'arbitrage') {
+        if (!Array.isArray(msg.arb)) return;
+        allArb = msg.arb;
+        if (msg.active) {
+          arbExchangeFilter = msg.active.arb_exchange;
+          arbQuoteFilter = msg.active.arb_quote;
+          syncQuoteBtns();
+        }
+        if (currentView === 'arbitrage') {
+          $arbTable.style.display = '';
+          requestAnimationFrame(renderArb);
+        }
+      } else {
+        if (!Array.isArray(msg.tickers)) return;
+        allTickers = msg.tickers;
+        if (msg.active) {
+          exchangeFilter = msg.active.exchange;
+          quoteFilter = msg.active.quote;
+          syncQuoteBtns();
+        }
+        if (currentView === 'tickers') {
+          $table.style.display = '';
+          requestAnimationFrame(renderTickers);
+        }
+      }
+    };
+  }
+
+  // --- Render Tickers ---
+  function renderTickers() {
+    let data = allTickers;
+
+    if (searchTerm) {
+      const s = searchTerm.toUpperCase();
+      data = data.filter(t => t.s.includes(s) || t.b.includes(s));
+    }
+
+    data.sort((a,b) => {
+      let va=a[sortKey], vb=b[sortKey];
+      if (typeof va==='string') return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+      return sortAsc?(va-vb):(vb-va);
+    });
+
+    const total = data.length;
+    totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (page >= totalPages) page = totalPages - 1;
+
+    $pairCount.textContent = total;
+    $pageInfo.textContent = (page+1)+'/'+totalPages;
+    $prevPage.disabled = page === 0;
+    $nextPage.disabled = page >= totalPages - 1;
+
+    const start = page * PAGE_SIZE;
+    const pageData = data.slice(start, start + PAGE_SIZE);
+
+    const newPrev = {};
+    const buf = new Array(pageData.length);
+    for (let i=0; i<pageData.length; i++) {
+      const t = pageData[i];
+      const key = t.s;
+      const prev = prevPrices[key];
+      let fc = '';
+      if (prev !== undefined && prev !== t.p) fc = t.p>prev?'flash-up':'flash-down';
+      newPrev[key] = t.p;
+      const gi = start + i + 1;
+
+      buf[i] =
+        '<tr class="'+fc+'">'+
+        '<td>'+gi+'</td>'+
+        '<td class="pair-cell"><span class="pair-base">'+t.b+'</span><span class="pair-quote">/'+t.q+'</span></td>'+
+        '<td>'+fP(t.p)+'</td>'+
+        '<td class="'+cc(t.pp)+'">'+fC(t.pp)+'</td>'+
+        '<td class="'+cc(t.pc)+'">'+fP(t.pc)+'</td>'+
+        '<td>'+fP(t.h)+'</td>'+
+        '<td>'+fP(t.l)+'</td>'+
+        '<td class="mag">'+t.am.toFixed(2)+'%</td>'+
+        '<td>'+fV(t.vb)+'</td>'+
+        '<td>'+fV(t.vq)+'</td>'+
+        '<td>'+fP(t.bi)+'</td>'+
+        '<td>'+fP(t.ak)+'</td>'+
+        '<td class="'+(t.sp>0.1?'ylw':'dim')+'">'+t.sp.toFixed(3)+'%</td>'+
+        '<td>'+fI(t.tc)+'</td>'+
+        '</tr>';
+    }
+    $tbody.innerHTML = buf.join('');
+    prevPrices = newPrev;
+  }
+
+  // --- Render Arbitrage ---
+  function renderArb() {
+    let data = allArb;
+
+    if (searchTerm) {
+      const s = searchTerm.toUpperCase();
+      data = data.filter(o => o.s.includes(s) || o.b.includes(s));
+    }
+
+    data.sort((a,b) => {
+      let va=a[arbSortKey], vb=b[arbSortKey];
+      if (typeof va==='string') return arbSortAsc?va.localeCompare(vb):vb.localeCompare(va);
+      return arbSortAsc?(va-vb):(vb-va);
+    });
+
+    const total = data.length;
+    totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (page >= totalPages) page = totalPages - 1;
+
+    $pairCount.textContent = total;
+    $pageInfo.textContent = (page+1)+'/'+totalPages;
+    $prevPage.disabled = page === 0;
+    $nextPage.disabled = page >= totalPages - 1;
+
+    const start = page * PAGE_SIZE;
+    const pageData = data.slice(start, start + PAGE_SIZE);
+
+    const buf = new Array(pageData.length);
+    for (let i=0; i<pageData.length; i++) {
+      const o = pageData[i];
+      const gi = start + i + 1;
+      const pfClass = o.pf >= 0.5 ? 'ylw' : o.pf >= 0.1 ? 'pos' : 'dim';
+      const npfClass = o.npf > 0 ? (o.npf >= 0.5 ? 'ylw' : 'pos') : o.npf < 0 ? 'neg' : 'dim';
+      const wfStr = o.wf > 0 ? '~'+fP(o.wf) : '\u2014';
+
+      buf[i] =
+        '<tr>'+
+        '<td>'+gi+'</td>'+
+        '<td class="pair-cell"><span class="pair-base">'+o.b+'</span><span class="pair-quote">/'+o.q+'</span></td>'+
+        '<td class="'+pfClass+'">'+o.pf.toFixed(3)+'%</td>'+
+        '<td class="'+npfClass+'">'+o.npf.toFixed(3)+'%</td>'+
+        '<td>'+wfStr+'</td>'+
+        '<td>'+fP(o.ak)+'</td>'+
+        '<td class="ex-tag">'+o.ax+'</td>'+
+        '<td>'+fP(o.bi)+'</td>'+
+        '<td class="ex-tag">'+o.bx+'</td>'+
+        '<td>'+fV(o.av)+'</td>'+
+        '<td>'+fV(o.bv)+'</td>'+
+        '</tr>';
+    }
+    $arbTbody.innerHTML = buf.join('');
+  }
+
+  // --- View Toggle ---
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+
+  // --- Quote Filter ---
+  $quoteBtns.querySelectorAll('.quote-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $quoteBtns.querySelectorAll('.quote-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (currentView === 'arbitrage') {
+        arbQuoteFilter = btn.dataset.q;
+      } else {
+        quoteFilter = btn.dataset.q;
+      }
+      page = 0;
+      sendFilters();
+    });
+  });
+
+  // --- Pagination ---
+  $prevPage.addEventListener('click', () => { if (page > 0) { page--; activeRender(); } });
+  $nextPage.addEventListener('click', () => { if (page < totalPages-1) { page++; activeRender(); } });
+
+  // --- Search ---
+  let searchTimer = null;
+  $search.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchTerm = $search.value.trim();
+      page = 0;
+      activeRender();
+    }, 150);
+  });
+
+  // --- Column Sort ---
+  document.querySelectorAll('th[data-key]').forEach(th => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.key;
+      const tbl = th.dataset.table;
+      if (k==='idx') return;
+
+      if (tbl === 'arb') {
+        if (arbSortKey===k) { arbSortAsc=!arbSortAsc; } else { arbSortKey=k; arbSortAsc=false; }
+      } else {
+        if (sortKey===k) { sortAsc=!sortAsc; } else { sortKey=k; sortAsc=false; }
+      }
+
+      // Update sorted class within same table
+      const parentTable = th.closest('table');
+      parentTable.querySelectorAll('th').forEach(h => h.classList.remove('sorted'));
+      th.classList.add('sorted');
+      const ar = th.querySelector('.sort-arrow');
+      const isAsc = tbl === 'arb' ? arbSortAsc : sortAsc;
+      if (ar) ar.textContent = isAsc?'\u25B2':'\u25BC';
+      page = 0;
+      activeRender();
+    });
+  });
+
+  // --- Keyboard ---
+  document.addEventListener('keydown', (e) => {
+    if (e.key==='/' && document.activeElement!==$search) { e.preventDefault(); $search.focus(); }
+    if (e.key==='Escape') { $search.value=''; searchTerm=''; $search.blur(); page=0; activeRender(); }
+    if (e.key==='ArrowRight' && document.activeElement!==$search) { if (page<totalPages-1) { page++; activeRender(); } }
+    if (e.key==='ArrowLeft' && document.activeElement!==$search) { if (page>0) { page--; activeRender(); } }
+  });
+
+  connect();
+})();
+</script>
+</body>
+</html>
