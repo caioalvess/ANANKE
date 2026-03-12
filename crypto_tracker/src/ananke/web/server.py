@@ -10,7 +10,7 @@ import asyncio
 import contextlib
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from aiohttp import web
@@ -36,8 +36,8 @@ class ClientState:
     # Ticker view filters
     exchange: str = ""
     quote: str = "USDT"
-    # Arbitrage view filters
-    arb_exchange: str = ""
+    # Arbitrage view filters (multi-select: empty = ALL)
+    arb_exchanges: list[str] = field(default_factory=list)
     arb_quote: str = "ALL"
 
 
@@ -188,16 +188,30 @@ def _compute_arbitrage(
 
 def _filter_arbitrage(
     arb: list[dict[str, str | float]],
-    exchange: str,
+    exchanges: list[str],
     quote: str,
 ) -> list[dict[str, str | float]]:
-    """Filter arbitrage results by exchange and/or quote."""
+    """Filter arbitrage results by exchange(s) and/or quote.
+
+    Exchange filter semantics:
+    - empty list: no filter (ALL)
+    - 1 exchange: show opps where either side matches (any involvement)
+    - 2+ exchanges: show opps where BOTH sides are in the set (pair filter)
+    """
     result: list[dict[str, str | float]] = []
+    ex_set = set(exchanges) if exchanges else None
+    single = len(exchanges) == 1
     for opp in arb:
         if quote != "ALL" and opp["q"] != quote:
             continue
-        if exchange and opp["bx"] != exchange and opp["ax"] != exchange:
-            continue
+        if ex_set is not None:
+            if single:
+                ex = next(iter(ex_set))
+                if opp["bx"] != ex and opp["ax"] != ex:
+                    continue
+            else:
+                if opp["bx"] not in ex_set or opp["ax"] not in ex_set:
+                    continue
         result.append(opp)
     return result
 
@@ -246,11 +260,16 @@ async def _ws_handler(request: web.Request) -> web.WebSocketResponse:
                     if "quote" in data and data["quote"]:
                         state.quote = str(data["quote"])
 
-                    # Arbitrage view filters
-                    if "arb_exchange" in data:
-                        ex = str(data["arb_exchange"])
-                        if ex == "" or ex in valid_exchanges:
-                            state.arb_exchange = ex
+                    # Arbitrage view filters (multi-select)
+                    if "arb_exchanges" in data:
+                        raw = data["arb_exchanges"]
+                        if isinstance(raw, list):
+                            state.arb_exchanges = [
+                                str(e) for e in raw
+                                if str(e) in valid_exchanges
+                            ]
+                        elif raw == "" or raw is None:
+                            state.arb_exchanges = []
                     if "arb_quote" in data:
                         state.arb_quote = str(data["arb_quote"])
 
@@ -282,7 +301,7 @@ async def _broadcast_loop(app: web.Application) -> None:
 
             for state in list(clients.values()):
                 if state.view == "arbitrage":
-                    key = (state.arb_exchange, state.arb_quote)
+                    key = (frozenset(state.arb_exchanges), state.arb_quote)
                     arb_groups.setdefault(key, []).append(state)
                 else:
                     key = (state.exchange, state.quote)
@@ -312,15 +331,15 @@ async def _broadcast_loop(app: web.Application) -> None:
             if arb_groups:
                 arb_all = _compute_arbitrage(all_tickers, registry, fees)
 
-                for (arb_ex, arb_q), group_clients in arb_groups.items():
-                    filtered = _filter_arbitrage(arb_all, arb_ex, arb_q)
+                for (arb_exs, arb_q), group_clients in arb_groups.items():
+                    filtered = _filter_arbitrage(arb_all, list(arb_exs), arb_q)
                     payload = json.dumps(
                         {
                             "view": "arbitrage",
                             "arb": filtered,
                             "exchanges": exchanges,
                             "active": {
-                                "arb_exchange": arb_ex,
+                                "arb_exchanges": sorted(arb_exs),
                                 "arb_quote": arb_q,
                             },
                         },

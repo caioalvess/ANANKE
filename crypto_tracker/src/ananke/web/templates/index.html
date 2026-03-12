@@ -316,8 +316,8 @@
   let exchangeFilter = '';
   let quoteFilter = 'USDT';
 
-  // Arb filters
-  let arbExchangeFilter = '';
+  // Arb filters (multi-select: empty array = ALL)
+  let arbExchangeFilter = [];
   let arbQuoteFilter = 'ALL';
 
   // Shared
@@ -384,7 +384,7 @@
     if (currentView === 'tickers') {
       ws.send(JSON.stringify({view:'tickers', exchange:exchangeFilter, quote:quoteFilter}));
     } else {
-      ws.send(JSON.stringify({view:'arbitrage', arb_exchange:arbExchangeFilter, arb_quote:arbQuoteFilter}));
+      ws.send(JSON.stringify({view:'arbitrage', arb_exchanges:arbExchangeFilter, arb_quote:arbQuoteFilter}));
     }
   }
 
@@ -401,24 +401,44 @@
   function rebuildExBtns() {
     const exs = activeExchanges;
     const isArb = currentView === 'arbitrage';
-    const currentEx = isArb ? arbExchangeFilter : exchangeFilter;
 
     let h = '';
     if (isArb) {
-      h += '<button class="filter-btn exchange-btn'+(currentEx===''?' active':'')+'" data-ex="">ALL</button>';
-    }
-    for (let i = 0; i < exs.length; i++) {
-      const ex = exs[i];
-      h += '<button class="filter-btn exchange-btn'+(currentEx===ex?' active':'')+'" data-ex="'+ex+'">'+ex.toUpperCase()+'</button>';
+      // Multi-select mode: ALL active when no exchanges selected
+      const isAll = arbExchangeFilter.length === 0;
+      h += '<button class="filter-btn exchange-btn'+(isAll?' active':'')+'" data-ex="">ALL</button>';
+      for (let i = 0; i < exs.length; i++) {
+        const ex = exs[i];
+        const sel = arbExchangeFilter.includes(ex);
+        h += '<button class="filter-btn exchange-btn'+(sel?' active':'')+'" data-ex="'+ex+'">'+ex.toUpperCase()+'</button>';
+      }
+    } else {
+      // Single-select mode for tickers
+      for (let i = 0; i < exs.length; i++) {
+        const ex = exs[i];
+        h += '<button class="filter-btn exchange-btn'+(exchangeFilter===ex?' active':'')+'" data-ex="'+ex+'">'+ex.toUpperCase()+'</button>';
+      }
     }
     $exBtns.innerHTML = h;
+
     $exBtns.querySelectorAll('.exchange-btn').forEach(b => {
       b.addEventListener('click', () => {
-        $exBtns.querySelectorAll('.exchange-btn').forEach(x => x.classList.remove('active'));
-        b.classList.add('active');
         if (isArb) {
-          arbExchangeFilter = b.dataset.ex;
+          const ex = b.dataset.ex;
+          if (ex === '') {
+            arbExchangeFilter = [];
+          } else {
+            const idx = arbExchangeFilter.indexOf(ex);
+            if (idx >= 0) {
+              arbExchangeFilter.splice(idx, 1);
+            } else {
+              arbExchangeFilter.push(ex);
+            }
+          }
+          rebuildExBtns();
         } else {
+          $exBtns.querySelectorAll('.exchange-btn').forEach(x => x.classList.remove('active'));
+          b.classList.add('active');
           exchangeFilter = b.dataset.ex;
         }
         page = 0;
@@ -499,9 +519,10 @@
         if (!Array.isArray(msg.arb)) return;
         allArb = msg.arb;
         if (msg.active) {
-          arbExchangeFilter = msg.active.arb_exchange;
+          arbExchangeFilter = msg.active.arb_exchanges || [];
           arbQuoteFilter = msg.active.arb_quote;
           syncQuoteBtns();
+          rebuildExBtns();
         }
         if (currentView === 'arbitrage') {
           $arbTable.style.display = '';

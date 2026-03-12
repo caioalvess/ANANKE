@@ -314,32 +314,58 @@ def test_filter_arb_by_quote() -> None:
         {"s": "ETHBTC", "b": "ETH", "q": "BTC", "bx": "OKX", "ax": "Binance",
          "bi": 0.05, "ak": 0.049, "pf": 2.0, "bv": 500, "av": 400},
     ]
-    result = _filter_arbitrage(arb, "", "USDT")
+    result = _filter_arbitrage(arb, [], "USDT")
     assert len(result) == 1
     assert result[0]["q"] == "USDT"
 
 
-def test_filter_arb_by_exchange() -> None:
+def test_filter_arb_by_single_exchange() -> None:
+    """Single exchange selected: show opps where either side matches."""
     arb = [
         {"s": "BTCUSDT", "b": "BTC", "q": "USDT", "bx": "Binance", "ax": "Kraken",
          "bi": 100, "ak": 99, "pf": 1.0, "bv": 1000, "av": 900},
         {"s": "ETHUSDT", "b": "ETH", "q": "USDT", "bx": "OKX", "ax": "KuCoin",
          "bi": 3000, "ak": 2990, "pf": 0.3, "bv": 500, "av": 400},
     ]
-    # Filter to only show opps involving Binance
-    result = _filter_arbitrage(arb, "Binance", "ALL")
+    result = _filter_arbitrage(arb, ["Binance"], "ALL")
     assert len(result) == 1
     assert result[0]["bx"] == "Binance"
 
 
-def test_filter_arb_all() -> None:
+def test_filter_arb_by_multi_exchange_pair() -> None:
+    """2 exchanges selected: show only opps where BOTH sides are in the set."""
+    arb = [
+        {"s": "BTCUSDT", "b": "BTC", "q": "USDT", "bx": "Binance", "ax": "Kraken",
+         "bi": 100, "ak": 99, "pf": 1.0, "bv": 1000, "av": 900},
+        {"s": "ETHUSDT", "b": "ETH", "q": "USDT", "bx": "OKX", "ax": "KuCoin",
+         "bi": 3000, "ak": 2990, "pf": 0.3, "bv": 500, "av": 400},
+        {"s": "SOLUSDT", "b": "SOL", "q": "USDT", "bx": "Binance", "ax": "OKX",
+         "bi": 150, "ak": 149, "pf": 0.5, "bv": 800, "av": 700},
+    ]
+    # Binance + Kraken: only BTC (Binance↔Kraken)
+    result = _filter_arbitrage(arb, ["Binance", "Kraken"], "ALL")
+    assert len(result) == 1
+    assert result[0]["s"] == "BTCUSDT"
+
+    # Binance + OKX: only SOL (Binance↔OKX)
+    result = _filter_arbitrage(arb, ["Binance", "OKX"], "ALL")
+    assert len(result) == 1
+    assert result[0]["s"] == "SOLUSDT"
+
+    # All three: BTC + SOL (both have Binance, paired with Kraken/OKX)
+    result = _filter_arbitrage(arb, ["Binance", "Kraken", "OKX"], "ALL")
+    assert len(result) == 2
+
+
+def test_filter_arb_empty_exchanges_all() -> None:
+    """Empty exchange list: no filter, show everything."""
     arb = [
         {"s": "BTCUSDT", "b": "BTC", "q": "USDT", "bx": "Binance", "ax": "Kraken",
          "bi": 100, "ak": 99, "pf": 1.0, "bv": 1000, "av": 900},
         {"s": "ETHBTC", "b": "ETH", "q": "BTC", "bx": "OKX", "ax": "Binance",
          "bi": 0.05, "ak": 0.049, "pf": 2.0, "bv": 500, "av": 400},
     ]
-    result = _filter_arbitrage(arb, "", "ALL")
+    result = _filter_arbitrage(arb, [], "ALL")
     assert len(result) == 2
 
 
