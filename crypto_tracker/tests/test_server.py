@@ -199,8 +199,8 @@ def test_arb_unknown_symbol_excluded() -> None:
     assert len(result) == 0
 
 
-def test_arb_large_profit_not_capped() -> None:
-    """Large arbitrage on confirmed symbol is never filtered."""
+def test_arb_large_spread_not_capped() -> None:
+    """Legitimate high-spread arb is never filtered by profit amount."""
     tickers = [
         _make_ticker("BTCUSDT", "Binance", bid=150.0, ask=155.0),
         _make_ticker("BTCUSDT", "Kraken", bid=95.0, ask=100.0),
@@ -208,6 +208,40 @@ def test_arb_large_profit_not_capped() -> None:
     result = _compute_arbitrage(tickers, registry=_registry_with_globals())
     assert len(result) == 1
     assert result[0]["pf"] == round((150.0 - 100.0) / 100.0 * 100, 4)  # 50%
+
+
+def test_arb_exchange_blocked_symbol() -> None:
+    """Symbol blocked on a specific exchange via name cross-validation."""
+    registry = CoinRegistry(
+        global_confirmed={"VRA": "verasity", "BTC": "bitcoin"},
+        kucoin_confirmed={},
+        ambiguous=frozenset(),
+        exchange_blocked=frozenset({("Gate.io", "VRA")}),
+    )
+    tickers = [
+        _make_ticker("VRAUSDT", "KuCoin", bid=0.0001, ask=0.00011),
+        _make_ticker("VRAUSDT", "Gate.io", bid=0.00002, ask=0.000021),
+    ]
+    result = _compute_arbitrage(tickers, registry=registry)
+    # Gate.io VRA blocked → not grouped with KuCoin VRA → no arb
+    assert len(result) == 0
+
+
+def test_arb_exchange_blocked_doesnt_affect_others() -> None:
+    """Exchange block is specific — same symbol on other exchanges still works."""
+    registry = CoinRegistry(
+        global_confirmed={"VRA": "verasity"},
+        kucoin_confirmed={},
+        ambiguous=frozenset(),
+        exchange_blocked=frozenset({("Gate.io", "VRA")}),
+    )
+    tickers = [
+        _make_ticker("VRAUSDT", "Binance", bid=0.00011, ask=0.000115),
+        _make_ticker("VRAUSDT", "KuCoin", bid=0.0001, ask=0.000105),
+    ]
+    result = _compute_arbitrage(tickers, registry=registry)
+    # Binance and KuCoin both resolve — arb found
+    assert len(result) == 1
 
 
 # --- Arbitrage with registry: KuCoin-specific confirmation ---
@@ -269,14 +303,15 @@ def test_arb_global_still_works_with_kucoin_registry() -> None:
 # --- Graceful degradation ---
 
 
-def test_arb_empty_registry_matches_everything() -> None:
-    """Empty registry = CoinGecko was unavailable → all symbols allowed."""
+def test_arb_empty_registry_allows_everything() -> None:
+    """Empty registry = CoinGecko unavailable → all symbols allowed,
+    including extreme spreads (graceful degradation, no profit cap)."""
     tickers = [
         _make_ticker("UUSDT", "Binance", bid=0.9997, ask=1.0),
         _make_ticker("UUSDT", "Bybit", bid=0.0008, ask=0.000871),
     ]
     result = _compute_arbitrage(tickers, registry=CoinRegistry.empty())
-    assert len(result) == 1  # false positive, but registry was unavailable
+    assert len(result) == 1  # accepted — registry was unavailable
 
 
 def test_arb_no_registry_matches_everything() -> None:
@@ -483,3 +518,115 @@ def test_arb_no_fees_npf_equals_pf() -> None:
     assert len(result) == 1
     assert result[0]["npf"] == result[0]["pf"]
     assert result[0]["wf"] == 0.0
+
+
+# --- Transfer status (executable arb filter) tests ---
+
+
+def _fee_registry_with_blocks(
+    withdraw_blocked: frozenset[tuple[str, str]] = frozenset(),
+    deposit_blocked: frozenset[tuple[str, str]] = frozenset(),
+) -> FeeRegistry:
+    return FeeRegistry(
+        taker={"Binance": 0.001, "Kraken": 0.004, "KuCoin": 0.001, "Gate.io": 0.002},
+        withdrawal={"BTC": 0.0005},
+        withdraw_blocked=withdraw_blocked,
+        deposit_blocked=deposit_blocked,
+    )
+
+
+def test_arb_withdraw_blocked_on_ask_exchange() -> None:
+    """Arb filtered when withdrawal is blocked on the ask (buy) exchange."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
+    ]
+    fees = _fee_registry_with_blocks(
+        withdraw_blocked=frozenset({("KuCoin", "BTC")}),
+    )
+    # Buy on KuCoin (ask), sell on Binance (bid) — need to withdraw from KuCoin
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 0
+
+
+def test_arb_deposit_blocked_on_bid_exchange() -> None:
+    """Arb filtered when deposit is blocked on the bid (sell) exchange."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
+    ]
+    fees = _fee_registry_with_blocks(
+        deposit_blocked=frozenset({("Binance", "BTC")}),
+    )
+    # Buy on KuCoin, deposit to Binance — deposit blocked on Binance
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 0
+
+
+def test_arb_withdraw_blocked_on_bid_doesnt_filter() -> None:
+    """Withdraw blocked on BID exchange doesn't affect arb (irrelevant direction)."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
+    ]
+    fees = _fee_registry_with_blocks(
+        withdraw_blocked=frozenset({("Binance", "BTC")}),
+    )
+    # Withdraw blocked on Binance (bid side) — doesn't matter, we sell there
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
+
+
+def test_arb_deposit_blocked_on_ask_doesnt_filter() -> None:
+    """Deposit blocked on ASK exchange doesn't affect arb (irrelevant direction)."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
+    ]
+    fees = _fee_registry_with_blocks(
+        deposit_blocked=frozenset({("KuCoin", "BTC")}),
+    )
+    # Deposit blocked on KuCoin (ask side) — doesn't matter, we buy there
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
+
+
+def test_arb_no_transfer_blocks_passes() -> None:
+    """No transfer blocks → arb passes through normally."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
+    ]
+    fees = _fee_registry_with_blocks()
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
+
+
+def test_arb_both_directions_blocked() -> None:
+    """Both withdraw on ask + deposit on bid blocked → filtered."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
+    ]
+    fees = _fee_registry_with_blocks(
+        withdraw_blocked=frozenset({("KuCoin", "BTC")}),
+        deposit_blocked=frozenset({("Binance", "BTC")}),
+    )
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 0
+
+
+def test_can_execute_arb_method() -> None:
+    """Direct test of FeeRegistry.can_execute_arb method."""
+    fees = _fee_registry_with_blocks(
+        withdraw_blocked=frozenset({("KuCoin", "VRA")}),
+        deposit_blocked=frozenset({("Gate.io", "DIN")}),
+    )
+    # VRA withdraw blocked on KuCoin
+    assert not fees.can_execute_arb("Binance", "KuCoin", "VRA")
+    assert fees.can_execute_arb("KuCoin", "Binance", "VRA")  # bid side, irrelevant
+    # DIN deposit blocked on Gate.io
+    assert not fees.can_execute_arb("Gate.io", "Binance", "DIN")
+    assert fees.can_execute_arb("Binance", "Gate.io", "DIN")  # ask side, irrelevant
+    # BTC — no blocks
+    assert fees.can_execute_arb("Binance", "KuCoin", "BTC")

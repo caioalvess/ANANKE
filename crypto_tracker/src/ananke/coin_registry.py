@@ -1,4 +1,4 @@
-"""CoinGecko + KuCoin canonical identity registry for cross-exchange arbitrage.
+"""CoinGecko + exchange name cross-validation registry for cross-exchange arbitrage.
 
 Problem: same ticker symbol can refer to different tokens on different exchanges.
 E.g., "U" on Binance = Uranium Finance (~$1.00), on Bybit = U Network (~$0.001).
@@ -10,24 +10,31 @@ Architecture (two layers, never mixed):
 
   Layer B — Reference data (identity source of truth)
     "Is this the same asset on both exchanges?" — comes from CoinGecko
-    catalog + KuCoin fullName, cached locally.
+    catalog + exchange-provided names (KuCoin fullName, Gate.io base_name),
+    cached locally.
 
 CoinGecko provides the canonical coin catalog: each coin has a unique `id`
 (e.g. "bitcoin"), a non-unique `symbol` (e.g. "BTC"), and a `name`.
-KuCoin provides `fullName` for its listed currencies — the only exchange
-in our set that exposes this publicly.
+KuCoin provides `fullName` and Gate.io provides `base_name` — used to
+cross-validate that a symbol on an exchange matches the CoinGecko entry.
 
 Resolution tiers (per exchange, per symbol):
 
   1. Globally confirmed — symbol is unique in CoinGecko (1 entry only)
-     OR the dominant coin is a top blue-chip.  No CEX would list a
-     different token under BTC/ETH/SOL.  Confirmed on ALL exchanges.
+     OR the dominant coin is a top blue-chip.  Confirmed on ALL exchanges
+     UNLESS an exchange's own name contradicts the CoinGecko name
+     (exchange_blocked).
 
   2. KuCoin confirmed — multi-entry symbol where KuCoin's fullName
      matches exactly one CoinGecko entry name.  Confirmed on KuCoin ONLY.
      Other exchanges cannot verify without fullName → blocked there.
 
   3. Ambiguous / unknown — blocked from cross-exchange arbitrage.
+
+  Exchange-specific block: if an exchange provides a name for a globally-
+  confirmed symbol that does NOT match the CoinGecko name, that symbol is
+  blocked on that specific exchange only.  CoinGecko's catalog is incomplete;
+  an exchange may list a different token under the same symbol.
 
 The golden rule: the arbitrage engine only compares two markets when
 BOTH sides resolve to the SAME canonical ID.  If identity cannot be
@@ -37,6 +44,7 @@ confirmed on an exchange, that side is excluded.  Period.
 import asyncio
 import json
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -47,6 +55,7 @@ logger = logging.getLogger(__name__)
 _COINGECKO_COINS_LIST = "https://api.coingecko.com/api/v3/coins/list"
 _COINGECKO_COINS_MARKETS = "https://api.coingecko.com/api/v3/coins/markets"
 _KUCOIN_CURRENCIES = "https://api.kucoin.com/api/v1/currencies"
+_GATEIO_CURRENCY_PAIRS = "https://api.gateio.ws/api/v4/spot/currency_pairs"
 
 # Only coins ranked in the top-N by market cap are auto-confirmed when
 # their symbol has multiple CoinGecko entries.  Top-50 = absolute blue
@@ -61,7 +70,8 @@ _CACHE_TTL = 86400  # 24 hours
 class CoinRegistry:
     """Maps (exchange, base_symbol) to canonical CoinGecko ID.
 
-    Three tiers:
+    Four layers:
+    - exchange_blocked: per-exchange blocks where name doesn't match CoinGecko
     - global_confirmed: confirmed on ALL exchanges (unique symbol or blue chip)
     - kucoin_confirmed: confirmed on KuCoin only (fullName matched CoinGecko)
     - ambiguous: known multi-entry symbols that could not be resolved
@@ -72,19 +82,24 @@ class CoinRegistry:
         global_confirmed: dict[str, str],
         kucoin_confirmed: dict[str, str],
         ambiguous: frozenset[str],
+        exchange_blocked: frozenset[tuple[str, str]] = frozenset(),
     ) -> None:
         self._global = global_confirmed      # SYMBOL -> coingecko_id
         self._kucoin = kucoin_confirmed      # SYMBOL -> coingecko_id
         self._ambiguous = ambiguous          # blocked symbols
+        self._exchange_blocked = exchange_blocked  # {("Gate.io", "VRA"), ...}
 
     def resolve(self, base_symbol: str, exchange: str = "") -> str | None:
         """Resolve a symbol to its canonical CoinGecko ID.
 
         Returns the canonical ID only if identity is confirmed for the
         given exchange.  Returns None (blocked) if ambiguous, unknown,
-        or unconfirmed on that exchange.
+        unconfirmed, or exchange-specific name mismatch.
         """
         upper = base_symbol.upper()
+        # Exchange-specific block (name mismatch with CoinGecko)
+        if (exchange, upper) in self._exchange_blocked:
+            return None
         # Tier 1: globally confirmed (unique or blue chip)
         if upper in self._global:
             return self._global[upper]
@@ -105,6 +120,10 @@ class CoinRegistry:
     @property
     def ambiguous_count(self) -> int:
         return len(self._ambiguous)
+
+    @property
+    def exchange_blocked_count(self) -> int:
+        return len(self._exchange_blocked)
 
     def has_data(self) -> bool:
         """True if the registry was populated (not empty/degraded)."""
@@ -129,14 +148,18 @@ def _load_cache() -> CoinRegistry | None:
         data = json.loads(_CACHE_FILE.read_text())
         if time.time() - data.get("ts", 0) > _CACHE_TTL:
             return None
+        blocked_raw = data.get("exchange_blocked", [])
         reg = CoinRegistry(
             global_confirmed=data.get("global_confirmed", {}),
             kucoin_confirmed=data.get("kucoin_confirmed", {}),
             ambiguous=frozenset(data.get("ambiguous", [])),
+            exchange_blocked=frozenset(tuple(p) for p in blocked_raw),
         )
         logger.info(
-            "Loaded coin registry from cache: %d global, %d kucoin, %d ambiguous",
-            reg.global_count, reg.kucoin_count, reg.ambiguous_count,
+            "Loaded coin registry from cache: %d global, %d kucoin, "
+            "%d ambiguous, %d exchange-blocked",
+            reg.global_count, reg.kucoin_count,
+            reg.ambiguous_count, reg.exchange_blocked_count,
         )
         return reg
     except Exception:
@@ -152,6 +175,9 @@ def _save_cache(registry: CoinRegistry) -> None:
             "global_confirmed": registry._global,
             "kucoin_confirmed": registry._kucoin,
             "ambiguous": sorted(registry._ambiguous),
+            "exchange_blocked": sorted(
+                [list(p) for p in registry._exchange_blocked]
+            ),
         }))
     except Exception:
         logger.debug("Could not write coin registry cache", exc_info=True)
@@ -243,6 +269,54 @@ async def _fetch_kucoin_fullnames(
     return result
 
 
+async def _fetch_gateio_names(
+    session: aiohttp.ClientSession,
+) -> dict[str, str]:
+    """Fetch Gate.io token names. Returns {SYMBOL: base_name}."""
+    try:
+        req_timeout = aiohttp.ClientTimeout(total=60)
+        async with session.get(
+            _GATEIO_CURRENCY_PAIRS, timeout=req_timeout,
+        ) as resp:
+            if resp.status != 200:
+                logger.warning("Gate.io /currency_pairs returned %d", resp.status)
+                return {}
+            data = await resp.json()
+    except Exception:
+        logger.warning("Gate.io /currency_pairs unreachable", exc_info=True)
+        return {}
+
+    result: dict[str, str] = {}
+    for pair in data:
+        if pair.get("trade_status") != "tradable":
+            continue
+        base = pair.get("base", "").upper()
+        name = pair.get("base_name", "")
+        if base and name and base not in result:
+            result[base] = name
+    logger.info("Gate.io: loaded names for %d currencies", len(result))
+    return result
+
+
+def _names_match(name_a: str, name_b: str) -> bool:
+    """Check if two token names refer to the same project.
+
+    Naming varies wildly across sources: "Bitcoin Cash" vs "BitcoinCash",
+    "Ankr Network" vs "AnkrNetwork", "USDC" vs "USD Coin", "Taraxa" vs
+    "Taraxa Coin".  Strategy: normalize aggressively (remove non-alnum,
+    lowercase), then check exact or substring containment.
+    """
+    a = re.sub(r"[^a-z0-9]", "", name_a.lower())
+    b = re.sub(r"[^a-z0-9]", "", name_b.lower())
+    if not a or not b:
+        return True  # can't compare, assume match
+    if a == b:
+        return True
+    # Substring: handles "usdc" in "usdcoin", "sushi" in "sushiswap",
+    # "ankr" prefix overlap, "taraxa" in "taraxacoin", etc.
+    return len(a) >= 3 and len(b) >= 3 and (a in b or b in a)
+
+
 # ---------------------------------------------------------------------------
 # Registry builder
 # ---------------------------------------------------------------------------
@@ -252,8 +326,9 @@ def _build_mappings(
     coins_list: list[dict],
     blue_chip_ids: set[str],
     kucoin_names: dict[str, str],
+    gateio_names: dict[str, str] | None = None,
 ) -> CoinRegistry:
-    """Build canonical mappings from CoinGecko + KuCoin data.
+    """Build canonical mappings from CoinGecko + exchange names.
 
     Strategy:
     1. Group CoinGecko coins by uppercase symbol.
@@ -261,6 +336,8 @@ def _build_mappings(
     3. Multiple coins, exactly 1 is a blue chip -> globally confirmed.
     4. Multiple coins, KuCoin fullName matches exactly 1 name -> KuCoin confirmed.
     5. Otherwise -> ambiguous (blocked from cross-exchange arbitrage).
+    6. Cross-validate: for globally confirmed symbols, verify exchange-provided
+       names match CoinGecko name.  Mismatch -> block on that exchange only.
     """
     # Group by symbol: {SYMBOL: [{id, name}, ...]}
     by_symbol: dict[str, list[dict[str, str]]] = {}
@@ -276,16 +353,22 @@ def _build_mappings(
     kucoin_confirmed: dict[str, str] = {}
     ambiguous: set[str] = set()
 
+    # CoinGecko name for symbols confirmed via "unique" path only.
+    # Blue chips skip cross-validation — no exchange would list a
+    # different token under BTC/ETH/SOL/etc.
+    crossval_names: dict[str, str] = {}
+
     for sym, entries in by_symbol.items():
         if len(entries) == 1:
             # Unique symbol — confirmed on all exchanges
             global_confirmed[sym] = entries[0]["id"]
+            crossval_names[sym] = entries[0]["name"]
             continue
 
         # Multiple entries — try blue chip disambiguation
         blue_hits = [e for e in entries if e["id"] in blue_chip_ids]
         if len(blue_hits) == 1:
-            # Exactly one is a top blue chip — no CEX would list another
+            # Exactly one is a top blue chip — trusted, no cross-validation
             global_confirmed[sym] = blue_hits[0]["id"]
             continue
 
@@ -305,16 +388,51 @@ def _build_mappings(
         # Truly ambiguous — blocked everywhere
         ambiguous.add(sym)
 
-    return CoinRegistry(global_confirmed, kucoin_confirmed, frozenset(ambiguous))
+    # --- Cross-validate exchange names against CoinGecko ---
+    # For globally confirmed symbols, if an exchange provides a name that
+    # doesn't match CoinGecko, block that (exchange, symbol) pair.
+    exchange_blocked: set[tuple[str, str]] = set()
+
+    exchange_name_sources: dict[str, dict[str, str]] = {
+        "KuCoin": kucoin_names,
+    }
+    if gateio_names:
+        exchange_name_sources["Gate.io"] = gateio_names
+
+    for sym, cg_name in crossval_names.items():
+        for ex_name, name_map in exchange_name_sources.items():
+            ex_token_name = name_map.get(sym, "")
+            if ex_token_name and not _names_match(cg_name, ex_token_name):
+                exchange_blocked.add((ex_name, sym))
+                logger.info(
+                    "Name mismatch: %s on %s is '%s' but CoinGecko says '%s' "
+                    "— blocked on %s",
+                    sym, ex_name, ex_token_name, cg_name, ex_name,
+                )
+
+    if exchange_blocked:
+        logger.info(
+            "Cross-validation blocked %d (exchange, symbol) pairs",
+            len(exchange_blocked),
+        )
+
+    return CoinRegistry(
+        global_confirmed, kucoin_confirmed,
+        frozenset(ambiguous), frozenset(exchange_blocked),
+    )
 
 
 async def build_registry() -> CoinRegistry:
     """Build the canonical coin registry.
 
-    Data sources (3 API calls at startup, cached 24h):
+    Data sources (4 API calls at startup, cached 24h):
     1. CoinGecko /coins/list — full coin catalog (id, symbol, name)
     2. CoinGecko /coins/markets — top blue chips by market cap
     3. KuCoin /api/v1/currencies — fullName for listed currencies
+    4. Gate.io /api/v4/spot/currency_pairs — base_name for listed pairs
+
+    Exchange names are cross-validated against CoinGecko names to detect
+    cases where an exchange lists a different token under the same symbol.
 
     On any failure returns an empty registry (graceful degradation —
     all symbols allowed, accepting the risk of collisions).
@@ -337,8 +455,11 @@ async def build_registry() -> CoinRegistry:
             # Fetch blue chips (1 call, top-50)
             blue_chip_ids = await _fetch_blue_chips(session)
 
-            # Fetch KuCoin fullNames concurrently (independent API)
-            kucoin_names = await _fetch_kucoin_fullnames(session)
+            # Fetch exchange names concurrently (independent APIs)
+            kucoin_names, gateio_names = await asyncio.gather(
+                _fetch_kucoin_fullnames(session),
+                _fetch_gateio_names(session),
+            )
     except Exception:
         logger.warning(
             "Registry data sources unreachable — registry unavailable",
@@ -346,15 +467,19 @@ async def build_registry() -> CoinRegistry:
         )
         return CoinRegistry.empty()
 
-    registry = _build_mappings(coins_list, blue_chip_ids, kucoin_names)
+    registry = _build_mappings(
+        coins_list, blue_chip_ids, kucoin_names, gateio_names,
+    )
     logger.info(
-        "Built coin registry: %d global, %d kucoin-only, %d ambiguous "
-        "(from %d CoinGecko coins, %d KuCoin currencies)",
+        "Built coin registry: %d global, %d kucoin-only, %d ambiguous, "
+        "%d exchange-blocked (from %d CoinGecko coins, %d KuCoin, %d Gate.io)",
         registry.global_count,
         registry.kucoin_count,
         registry.ambiguous_count,
+        registry.exchange_blocked_count,
         len(coins_list),
         len(kucoin_names),
+        len(gateio_names),
     )
     _save_cache(registry)
     return registry

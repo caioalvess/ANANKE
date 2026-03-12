@@ -54,6 +54,15 @@ class KucoinConfig:
 
 
 @dataclass(frozen=True)
+class GateioConfig:
+    """Gate.io exchange connection settings (REST polling)."""
+
+    rest_url: str = "https://api.gateio.ws"
+    poll_interval_sec: float = 2.0
+    rest_timeout_sec: int = 15
+
+
+@dataclass(frozen=True)
 class WebConfig:
     """Web server settings."""
 
@@ -80,7 +89,8 @@ class AppConfig:
     okx: OkxConfig = field(default_factory=OkxConfig)
     kraken: KrakenConfig = field(default_factory=KrakenConfig)
     kucoin: KucoinConfig = field(default_factory=KucoinConfig)
-    enabled_exchanges: tuple[str, ...] = ("binance", "bybit", "okx", "kraken", "kucoin")
+    gateio: GateioConfig = field(default_factory=GateioConfig)
+    enabled_exchanges: tuple[str, ...] = ("binance", "bybit", "okx", "kraken", "kucoin", "gateio")
     web: WebConfig = field(default_factory=WebConfig)
     display: DisplayConfig = field(default_factory=DisplayConfig)
     log_level: str = "WARNING"
@@ -121,6 +131,7 @@ def load_config() -> AppConfig:
     okx_d = OkxConfig()
     krk_d = KrakenConfig()
     kuc_d = KucoinConfig()
+    gio_d = GateioConfig()
     web_d = WebConfig()
     disp_d = DisplayConfig()
 
@@ -154,6 +165,11 @@ def load_config() -> AppConfig:
             rest_url=_env("ANANKE_KUCOIN_REST_URL", kuc_d.rest_url),
             poll_interval_sec=_env_float("ANANKE_KUCOIN_POLL_INTERVAL", kuc_d.poll_interval_sec),
             rest_timeout_sec=_env_int("ANANKE_KUCOIN_REST_TIMEOUT", kuc_d.rest_timeout_sec),
+        ),
+        gateio=GateioConfig(
+            rest_url=_env("ANANKE_GATEIO_REST_URL", gio_d.rest_url),
+            poll_interval_sec=_env_float("ANANKE_GATEIO_POLL_INTERVAL", gio_d.poll_interval_sec),
+            rest_timeout_sec=_env_int("ANANKE_GATEIO_REST_TIMEOUT", gio_d.rest_timeout_sec),
         ),
         enabled_exchanges=tuple(
             name.strip() for name in enabled_raw.split(",") if name.strip()

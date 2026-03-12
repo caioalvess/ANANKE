@@ -27,6 +27,7 @@ EXCHANGE_ABBREV: dict[str, str] = {
     "OKX": "OKX",
     "Kraken": "KRK",
     "KuCoin": "KUC",
+    "Gate.io": "GIO",
 }
 
 

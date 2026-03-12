@@ -151,6 +151,13 @@ def _compute_arbitrage(
             continue
         if entry["max_bid"] <= entry["min_ask"]:
             continue
+        # Filter non-executable arbs (transfers blocked)
+        if fees and not fees.can_execute_arb(
+            bid_exchange=entry["max_bid_ex"],
+            ask_exchange=entry["min_ask_ex"],
+            symbol=entry["base"],
+        ):
+            continue
         bid = entry["max_bid"]
         ask = entry["min_ask"]
         profit = (bid - ask) / ask * 100
@@ -297,7 +304,7 @@ async def _broadcast_loop(app: web.Application) -> None:
 
             # Split clients by view
             ticker_groups: dict[tuple[str, str], list[ClientState]] = {}
-            arb_groups: dict[tuple[str, str], list[ClientState]] = {}
+            arb_groups: dict[tuple[frozenset[str], str], list[ClientState]] = {}
 
             for state in list(clients.values()):
                 if state.view == "arbitrage":

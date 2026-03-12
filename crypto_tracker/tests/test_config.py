@@ -44,7 +44,7 @@ def test_config_immutable() -> None:
 
 def test_enabled_exchanges_default() -> None:
     cfg = AppConfig()
-    assert cfg.enabled_exchanges == ("binance", "bybit", "okx", "kraken", "kucoin")
+    assert cfg.enabled_exchanges == ("binance", "bybit", "okx", "kraken", "kucoin", "gateio")
 
 
 def test_env_int_valid(monkeypatch: pytest.MonkeyPatch) -> None:

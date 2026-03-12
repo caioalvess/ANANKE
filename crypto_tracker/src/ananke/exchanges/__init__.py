@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from ananke.exchanges.base import Exchange
 from ananke.exchanges.binance import BinanceExchange
 from ananke.exchanges.bybit import BybitExchange
+from ananke.exchanges.gateio import GateioExchange
 from ananke.exchanges.kraken import KrakenExchange
 from ananke.exchanges.kucoin import KucoinExchange
 from ananke.exchanges.manager import ExchangeManager
@@ -19,6 +20,7 @@ __all__ = [
     "Exchange",
     "BinanceExchange",
     "BybitExchange",
+    "GateioExchange",
     "KrakenExchange",
     "KucoinExchange",
     "OkxExchange",
@@ -32,6 +34,7 @@ _REGISTRY: dict[str, type] = {
     "okx": OkxExchange,
     "kraken": KrakenExchange,
     "kucoin": KucoinExchange,
+    "gateio": GateioExchange,
 }
 
 
@@ -50,6 +53,7 @@ def create_exchanges(config: AppConfig) -> list[Exchange]:
         "okx": config.okx,
         "kraken": config.kraken,
         "kucoin": config.kucoin,
+        "gateio": config.gateio,
     }
 
     exchanges: list[Exchange] = []
