@@ -7,8 +7,6 @@ from ananke.models import Ticker
 from ananke.web.server import (
     _compute_arbitrage,
     _filter_arbitrage,
-    _filter_tickers,
-    _serialize_ticker,
 )
 
 
@@ -31,52 +29,6 @@ def _make_ticker(
         volume_quote=volume_quote,
         exchange=exchange,
     )
-
-
-# --- Ticker filter tests ---
-
-
-def test_serialize_ticker_keys() -> None:
-    t = _make_ticker("BTCUSDT", "Binance")
-    result = _serialize_ticker(t)
-    assert result["s"] == "BTCUSDT"
-    assert result["ex"] == "Binance"
-    assert "p" in result
-    assert "sp" in result
-
-
-def test_filter_by_exchange() -> None:
-    tickers = [
-        _make_ticker("BTCUSDT", "Binance"),
-        _make_ticker("ETHUSDT", "Bybit"),
-    ]
-    result = _filter_tickers(tickers, "Binance", "USDT")
-    assert len(result) == 1
-    assert result[0]["s"] == "BTCUSDT"
-
-
-def test_filter_by_quote() -> None:
-    tickers = [
-        _make_ticker("BTCUSDT", "Binance", "USDT"),
-        _make_ticker("ETHBTC", "Binance", "BTC"),
-    ]
-    result = _filter_tickers(tickers, "Binance", "USDT")
-    assert len(result) == 1
-    assert result[0]["s"] == "BTCUSDT"
-
-
-def test_filter_all_quotes() -> None:
-    tickers = [
-        _make_ticker("BTCUSDT", "Binance", "USDT"),
-        _make_ticker("ETHBTC", "Binance", "BTC"),
-    ]
-    result = _filter_tickers(tickers, "Binance", "ALL")
-    assert len(result) == 2
-
-
-def test_filter_empty() -> None:
-    result = _filter_tickers([], "Binance", "USDT")
-    assert result == []
 
 
 # --- Arbitrage engine tests (no registry = graceful degradation) ---
@@ -540,60 +492,25 @@ def _fee_registry_with_blocks(
     )
 
 
-def test_arb_withdraw_blocked_on_ask_exchange() -> None:
-    """Arb filtered when withdrawal is blocked on the ask (buy) exchange."""
+def test_arb_transfer_blocked_not_filtered() -> None:
+    """Transfer blocks are tracked but do NOT filter arb results (incomplete coverage)."""
     tickers = [
         _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
         _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
     ]
+    # Withdraw blocked on ask exchange — previously filtered, now passes through
     fees = _fee_registry_with_blocks(
         withdraw_blocked=frozenset({("KuCoin", "BTC")}),
     )
-    # Buy on KuCoin (ask), sell on Binance (bid) — need to withdraw from KuCoin
     result = _compute_arbitrage(tickers, fees=fees)
-    assert len(result) == 0
+    assert len(result) == 1
 
-
-def test_arb_deposit_blocked_on_bid_exchange() -> None:
-    """Arb filtered when deposit is blocked on the bid (sell) exchange."""
-    tickers = [
-        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
-        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
-    ]
-    fees = _fee_registry_with_blocks(
+    # Deposit blocked on bid exchange — also passes through
+    fees2 = _fee_registry_with_blocks(
         deposit_blocked=frozenset({("Binance", "BTC")}),
     )
-    # Buy on KuCoin, deposit to Binance — deposit blocked on Binance
-    result = _compute_arbitrage(tickers, fees=fees)
-    assert len(result) == 0
-
-
-def test_arb_withdraw_blocked_on_bid_doesnt_filter() -> None:
-    """Withdraw blocked on BID exchange doesn't affect arb (irrelevant direction)."""
-    tickers = [
-        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
-        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
-    ]
-    fees = _fee_registry_with_blocks(
-        withdraw_blocked=frozenset({("Binance", "BTC")}),
-    )
-    # Withdraw blocked on Binance (bid side) — doesn't matter, we sell there
-    result = _compute_arbitrage(tickers, fees=fees)
-    assert len(result) == 1
-
-
-def test_arb_deposit_blocked_on_ask_doesnt_filter() -> None:
-    """Deposit blocked on ASK exchange doesn't affect arb (irrelevant direction)."""
-    tickers = [
-        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
-        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
-    ]
-    fees = _fee_registry_with_blocks(
-        deposit_blocked=frozenset({("KuCoin", "BTC")}),
-    )
-    # Deposit blocked on KuCoin (ask side) — doesn't matter, we buy there
-    result = _compute_arbitrage(tickers, fees=fees)
-    assert len(result) == 1
+    result2 = _compute_arbitrage(tickers, fees=fees2)
+    assert len(result2) == 1
 
 
 def test_arb_no_transfer_blocks_passes() -> None:
@@ -607,8 +524,8 @@ def test_arb_no_transfer_blocks_passes() -> None:
     assert len(result) == 1
 
 
-def test_arb_both_directions_blocked() -> None:
-    """Both withdraw on ask + deposit on bid blocked → filtered."""
+def test_arb_both_directions_blocked_still_shown() -> None:
+    """Both directions blocked — still shown (no filtering on transfer status)."""
     tickers = [
         _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
         _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
@@ -618,7 +535,7 @@ def test_arb_both_directions_blocked() -> None:
         deposit_blocked=frozenset({("Binance", "BTC")}),
     )
     result = _compute_arbitrage(tickers, fees=fees)
-    assert len(result) == 0
+    assert len(result) == 1
 
 
 def test_can_execute_arb_method() -> None:
@@ -835,40 +752,27 @@ def test_arb_wf_uses_ask_exchange_fee() -> None:
     assert result[0]["wf"] == round(0.0001 * 60100.0, 8)
 
 
-# --- Hedge mode tests ---
+# --- Unified view tests (no hedge/transfer split) ---
 
 
-def test_hedge_mode_no_withdrawal_fee() -> None:
-    """Hedge mode: wf is always 0, tnpf equals npf."""
+def test_unified_view_has_wf_and_tnpf() -> None:
+    """Unified view always includes wf and tnpf (transfer costs visible)."""
     tickers = [
         _make_ticker("BTCUSDT", "Binance", bid=60100.0, ask=60200.0, volume_quote=50_000),
         _make_ticker("BTCUSDT", "Kraken", bid=59800.0, ask=60000.0, volume_quote=50_000),
     ]
     fees = _fee_registry()
-    result = _compute_arbitrage(tickers, fees=fees, mode="hedge")
+    result = _compute_arbitrage(tickers, fees=fees)
     assert len(result) == 1
     opp = result[0]
-    assert opp["wf"] == 0.0
-    assert opp["tnpf"] == opp["npf"]
+    assert "wf" in opp
+    assert "tnpf" in opp
+    assert opp["wf"] > 0  # BTC has withdrawal fee
+    assert opp["tnpf"] < opp["npf"]  # tnpf accounts for withdrawal
 
 
-def test_hedge_mode_has_rebal_cost() -> None:
-    """Hedge mode: rc (rebal cost) shows withdrawal fee for informational use."""
-    tickers = [
-        _make_ticker("BTCUSDT", "Binance", bid=60100.0, ask=60200.0, volume_quote=50_000),
-        _make_ticker("BTCUSDT", "Kraken", bid=59800.0, ask=60000.0, volume_quote=50_000),
-    ]
-    fees = _fee_registry()
-    result = _compute_arbitrage(tickers, fees=fees, mode="hedge")
-    assert len(result) == 1
-    opp = result[0]
-    # rc = BTC withdrawal fee (0.0005) * bid price (60100)
-    assert opp["rc"] == round(0.0005 * 60100.0, 8)
-    assert opp["rc"] > 0
-
-
-def test_hedge_mode_skips_can_execute_arb() -> None:
-    """Hedge mode: transfer blocks are ignored (trader doesn't transfer)."""
+def test_transfer_blocks_not_filtered() -> None:
+    """Transfer blocks are tracked but do NOT filter arb results."""
     tickers = [
         _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
         _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0, volume_quote=50_000),
@@ -876,63 +780,28 @@ def test_hedge_mode_skips_can_execute_arb() -> None:
     fees = _fee_registry_with_blocks(
         withdraw_blocked=frozenset({("KuCoin", "BTC")}),
     )
-    # Transfer mode: blocked
-    result_transfer = _compute_arbitrage(tickers, fees=fees, mode="transfer")
-    assert len(result_transfer) == 0
-    # Hedge mode: passes through
-    result_hedge = _compute_arbitrage(tickers, fees=fees, mode="hedge")
-    assert len(result_hedge) == 1
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
 
 
-def test_hedge_mode_npf_same_as_transfer() -> None:
-    """Hedge and transfer modes compute the same npf (taker-fee-only profit)."""
-    tickers = [
-        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
-        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=50_000),
-    ]
-    fees = _fee_registry()
-    r_hedge = _compute_arbitrage(tickers, fees=fees, mode="hedge")
-    r_transfer = _compute_arbitrage(tickers, fees=fees, mode="transfer")
-    assert len(r_hedge) == 1
-    assert len(r_transfer) == 1
-    assert r_hedge[0]["npf"] == r_transfer[0]["npf"]
-
-
-def test_hedge_mode_has_min_side_volume() -> None:
-    """Both modes include msv (min side volume) field."""
+def test_min_side_volume() -> None:
+    """Results include msv (min side volume) field."""
     tickers = [
         _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
         _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=20_000),
     ]
-    r_hedge = _compute_arbitrage(tickers, mode="hedge")
-    assert len(r_hedge) == 1
-    assert r_hedge[0]["msv"] == 20_000
-
-    r_transfer = _compute_arbitrage(tickers, mode="transfer")
-    assert len(r_transfer) == 1
-    assert r_transfer[0]["msv"] == 20_000
-
-
-def test_transfer_mode_rc_equals_wf() -> None:
-    """In transfer mode, rc equals wf (same withdrawal cost)."""
-    tickers = [
-        _make_ticker("BTCUSDT", "Binance", bid=60100.0, ask=60200.0, volume_quote=50_000),
-        _make_ticker("BTCUSDT", "Kraken", bid=59800.0, ask=60000.0, volume_quote=50_000),
-    ]
-    fees = _fee_registry()
-    result = _compute_arbitrage(tickers, fees=fees, mode="transfer")
+    result = _compute_arbitrage(tickers)
     assert len(result) == 1
-    assert result[0]["rc"] == result[0]["wf"]
+    assert result[0]["msv"] == 20_000
 
 
-def test_hedge_mode_no_fees_rc_zero() -> None:
-    """Hedge without fee registry: rc is 0."""
+def test_no_fees_wf_zero_tnpf_equals_npf() -> None:
+    """Without fee registry: wf is 0, tnpf equals npf."""
     tickers = [
         _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
         _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0),
     ]
-    result = _compute_arbitrage(tickers, mode="hedge")
+    result = _compute_arbitrage(tickers)
     assert len(result) == 1
-    assert result[0]["rc"] == 0.0
     assert result[0]["wf"] == 0.0
     assert result[0]["tnpf"] == result[0]["npf"]

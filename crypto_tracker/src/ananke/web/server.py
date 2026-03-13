@@ -1,9 +1,9 @@
 """
 ANANKE Web Server — aiohttp backend for multi-exchange crypto tracker.
 
-Each client sends its active filters (exchange, quote) via WebSocket.
-The server broadcasts only matching tickers per client, minimizing payload.
-Supports two views: tickers (per-exchange) and arbitrage (cross-exchange).
+Each client sends its active filters via WebSocket.
+The server broadcasts filtered data per client, minimizing payload.
+Views: arbitrage (cross-exchange), triangular (intra-exchange), metrics.
 """
 
 import asyncio
@@ -37,55 +37,12 @@ class ClientState:
     """Per-client filter state."""
 
     ws: WebSocketResponse
-    view: str = "tickers"
-    # Ticker view filters
-    exchange: str = ""
-    quote: str = "USDT"
+    view: str = "arbitrage"
     # Arbitrage view filters (multi-select: empty = ALL)
     arb_exchanges: list[str] = field(default_factory=list)
     arb_quote: str = "ALL"
-    arb_mode: str = "transfer"  # "transfer" or "hedge"
     # Triangular view filters
     tri_exchange: str = ""  # single exchange (triangular is intra-exchange)
-
-
-def _serialize_ticker(t: Ticker) -> dict[str, str | int | float]:
-    """Convert Ticker to a compact JSON-safe dict with short keys."""
-    return {
-        "s": t.symbol,
-        "b": t.base_asset,
-        "q": t.quote_asset,
-        "p": t.price,
-        "pc": t.price_change,
-        "pp": t.price_change_pct,
-        "h": t.high_24h,
-        "l": t.low_24h,
-        "vb": t.volume_base,
-        "vq": t.volume_quote,
-        "bi": t.bid,
-        "ak": t.ask,
-        "sp": round(t.spread, 4),
-        "am": round(t.amplitude, 2),
-        "tc": t.trades_count,
-        "ex": t.exchange,
-        "ts": int(t.last_update.timestamp() * 1000),
-    }
-
-
-def _filter_tickers(
-    tickers: list[Ticker],
-    exchange: str,
-    quote: str,
-) -> list[dict[str, str | int | float]]:
-    """Filter and serialize tickers for a client's active filters."""
-    result: list[dict[str, str | int | float]] = []
-    for t in tickers:
-        if t.exchange != exchange:
-            continue
-        if quote != "ALL" and t.quote_asset != quote:
-            continue
-        result.append(_serialize_ticker(t))
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -169,8 +126,6 @@ def _compute_arbitrage(
                 entry["min_ask_vol"] = t.volume_quote
                 entry["min_ask_ts"] = ts
 
-    is_hedge = mode == "hedge"
-
     results: list[dict[str, str | float]] = []
     for entry in best.values():
         if not entry["multi"]:
@@ -178,13 +133,6 @@ def _compute_arbitrage(
         if entry["max_bid_ex"] == entry["min_ask_ex"]:
             continue
         if entry["max_bid"] <= entry["min_ask"]:
-            continue
-        # Transfer mode: filter non-executable arbs (transfers blocked)
-        if not is_hedge and fees and not fees.can_execute_arb(
-            bid_exchange=entry["max_bid_ex"],
-            ask_exchange=entry["min_ask_ex"],
-            symbol=entry["base"],
-        ):
             continue
         bid = entry["max_bid"]
         ask = entry["min_ask"]
@@ -209,13 +157,9 @@ def _compute_arbitrage(
             net_pf = profit
             rc = 0.0
 
-        if is_hedge:
-            wf = 0.0
-            tnpf = net_pf
-        else:
-            wf = rc
-            ref_size = arb_config.ref_trade_size if arb_config else 1000.0
-            tnpf = net_pf - (wf / ref_size) * 100 if ref_size > 0 and wf > 0 else net_pf
+        wf = rc
+        ref_size = arb_config.ref_trade_size if arb_config else 1000.0
+        tnpf = net_pf - (wf / ref_size) * 100 if ref_size > 0 and wf > 0 else net_pf
 
         now_ms = int(time.time() * 1000)
         bts = entry["max_bid_ts"]
@@ -235,7 +179,6 @@ def _compute_arbitrage(
             "npf": round(net_pf, 4),
             "tnpf": round(tnpf, 4),
             "wf": wf,
-            "rc": rc,
             "msv": msv,
             "bv": entry["max_bid_vol"],
             "av": entry["min_ask_vol"],
@@ -245,6 +188,63 @@ def _compute_arbitrage(
         })
 
     return results
+
+
+def _rank_arbitrage(
+    results: list[dict],
+    *,
+    mode: str = "transfer",
+    ref_trade_size: float = 1000.0,
+) -> None:
+    """Assign quality tier (qt) and sort by execution quality (in-place).
+
+    Nothing is hidden, nothing is capped — every opportunity stays
+    visible and ranked purely on objective execution signals.
+
+    Tiers:
+        1 — Verified: depth probe confirms profitable execution
+            (ex1k > 0) with sufficient order book depth
+        2 — Unverified: no depth data available (outside top-N probe)
+        3 — Non-executable: depth proves loss (ex1k <= 0) or data
+            is stale (>30s, likely no longer exists)
+
+    Large spreads (10%+, 100%+) on low-cap tokens are a real phenomenon
+    in crypto — isolated liquidity, network suspensions, regional
+    exchanges. These CAN be executable if pre-funded.
+    The system informs; the trader decides.
+    """
+    profit_key = "tnpf" if mode == "transfer" else "npf"
+
+    for r in results:
+        ex1k = r.get("ex1k")
+        mdq = r.get("mdq")
+        age_ms = r.get("age", 0)
+
+        # Stale: >30s means at least one side hasn't updated.
+        # The opportunity likely no longer exists at quoted prices.
+        if age_ms > 30_000:
+            r["qt"] = 3
+            continue
+
+        # Depth-based assessment — the only objective quality signal.
+        if ex1k is not None:
+            if ex1k > 0:
+                fill = min(1.0, (mdq or 0) / ref_trade_size) if ref_trade_size > 0 else 1.0
+                r["qt"] = 1 if fill >= 0.5 else 2
+            else:
+                r["qt"] = 3
+        else:
+            r["qt"] = 2
+
+    def _sort_key(r: dict) -> tuple[int, float]:
+        qt = r.get("qt", 2)
+        if qt == 1:
+            return (0, -(r.get("ex1k") or 0))
+        if qt == 3:
+            return (2, -(r.get(profit_key) or r.get("pf") or 0))
+        return (1, -(r.get(profit_key) or r.get("pf") or 0))
+
+    results.sort(key=_sort_key)
 
 
 def _filter_arbitrage(
@@ -302,8 +302,7 @@ async def _ws_handler(request: web.Request) -> web.WebSocketResponse:
     ws = WebSocketResponse(heartbeat=config.ws_heartbeat)
     await ws.prepare(request)
 
-    default_exchange = manager.exchange_names[0] if manager.exchange_names else ""
-    state = ClientState(ws=ws, exchange=default_exchange)
+    state = ClientState(ws=ws)
     client_id = id(ws)
     clients[client_id] = state
     logger.info("Client connected (%d total)", len(clients))
@@ -317,16 +316,8 @@ async def _ws_handler(request: web.Request) -> web.WebSocketResponse:
 
                     if "view" in data:
                         v = str(data["view"])
-                        if v in ("tickers", "arbitrage", "triangular", "metrics"):
+                        if v in ("arbitrage", "triangular", "metrics"):
                             state.view = v
-
-                    # Ticker view filters
-                    if "exchange" in data and data["exchange"]:
-                        ex = str(data["exchange"])
-                        if ex in valid_exchanges:
-                            state.exchange = ex
-                    if "quote" in data and data["quote"]:
-                        state.quote = str(data["quote"])
 
                     # Arbitrage view filters (multi-select)
                     if "arb_exchanges" in data:
@@ -340,10 +331,6 @@ async def _ws_handler(request: web.Request) -> web.WebSocketResponse:
                             state.arb_exchanges = []
                     if "arb_quote" in data:
                         state.arb_quote = str(data["arb_quote"])
-                    if "arb_mode" in data:
-                        m = str(data["arb_mode"])
-                        if m in ("transfer", "hedge"):
-                            state.arb_mode = m
                     if "tri_exchange" in data:
                         tex = str(data["tri_exchange"])
                         if tex in valid_exchanges or tex == "":
@@ -360,9 +347,23 @@ async def _ws_handler(request: web.Request) -> web.WebSocketResponse:
 
 async def _broadcast_loop(app: web.Application) -> None:
     """Broadcast filtered data to each client based on their view and filters."""
+    config: WebConfig = app["web_config"]
+
+    while True:
+        try:
+            await _broadcast_tick(app)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Broadcast loop error — continuing")
+
+        await asyncio.sleep(config.broadcast_interval)
+
+
+async def _broadcast_tick(app: web.Application) -> None:
+    """Single broadcast iteration — extracted for error isolation."""
     clients: dict[int, ClientState] = app["clients"]
     manager: ExchangeManager = app["manager"]
-    config: WebConfig = app["web_config"]
     registry: CoinRegistry = app["coin_registry"]
     fees: FeeRegistry = app["fee_registry"]
     arb_config: ArbitrageConfig = app["arb_config"]
@@ -370,184 +371,144 @@ async def _broadcast_loop(app: web.Application) -> None:
     alert_engine: AlertEngine | None = app.get("alert_engine")
     metrics: MetricsCollector = app["metrics"]
 
-    while True:
-        if clients and manager.has_data():
-            all_tickers = manager.get_all_tickers()
-            exchanges = manager.exchange_names
+    if not (clients and manager.has_data()):
+        return
 
-            # Split clients by view
-            ticker_groups: dict[tuple[str, str], list[ClientState]] = {}
-            arb_groups: dict[
-                tuple[str, frozenset[str], str], list[ClientState]
-            ] = {}
-            tri_groups: dict[str, list[ClientState]] = {}
-            metrics_clients: list[ClientState] = []
+    all_tickers = manager.get_all_tickers()
+    exchanges = manager.exchange_names
 
-            for state in list(clients.values()):
-                if state.view == "metrics":
-                    metrics_clients.append(state)
-                elif state.view == "arbitrage":
-                    key = (
-                        state.arb_mode,
-                        frozenset(state.arb_exchanges),
-                        state.arb_quote,
-                    )
-                    arb_groups.setdefault(key, []).append(state)
-                elif state.view == "triangular":
-                    tri_groups.setdefault(
-                        state.tri_exchange, [],
-                    ).append(state)
-                else:
-                    key = (state.exchange, state.quote)
-                    ticker_groups.setdefault(key, []).append(state)
+    # Split clients by view
+    arb_groups: dict[
+        tuple[frozenset[str], str], list[ClientState]
+    ] = {}
+    tri_groups: dict[str, list[ClientState]] = {}
+    metrics_clients: list[ClientState] = []
 
-            dead: list[int] = []
+    for state in list(clients.values()):
+        if state.view == "metrics":
+            metrics_clients.append(state)
+        elif state.view == "triangular":
+            tri_groups.setdefault(
+                state.tri_exchange, [],
+            ).append(state)
+        else:
+            key = (frozenset(state.arb_exchanges), state.arb_quote)
+            arb_groups.setdefault(key, []).append(state)
 
-            server_ts = int(time.time() * 1000)
+    dead: list[int] = []
 
-            # --- Ticker broadcasts ---
-            for (exchange, quote), group_clients in ticker_groups.items():
-                filtered = _filter_tickers(all_tickers, exchange, quote)
-                payload = json.dumps(
-                    {
-                        "view": "tickers",
-                        "tickers": filtered,
-                        "exchanges": exchanges,
-                        "active": {"exchange": exchange, "quote": quote},
-                        "server_ts": server_ts,
+    server_ts = int(time.time() * 1000)
+
+    # --- Arbitrage broadcasts (compute once, filter per client group) ---
+    arb_results: list[dict[str, str | float]] | None = None
+    if arb_groups or metrics_clients or (alert_engine and alert_engine.enabled):
+        arb_results = _compute_arbitrage(
+            all_tickers, registry, fees, arb_config,
+            mode="transfer",
+        )
+        if depth_probe:
+            try:
+                await depth_probe.enrich_arb_results(
+                    arb_results,
+                    top_n=arb_config.depth_top_n,
+                    trade_size=arb_config.ref_trade_size,
+                    fees=fees,
+                )
+            except Exception:
+                logger.debug("Depth enrichment failed", exc_info=True)
+
+        metrics.record(arb_results)
+        metrics.enrich_arb_results(arb_results)
+        _rank_arbitrage(
+            arb_results,
+            mode="transfer",
+            ref_trade_size=arb_config.ref_trade_size,
+        )
+
+        for (arb_exs, arb_q), group_clients in arb_groups.items():
+            filtered = _filter_arbitrage(
+                arb_results, list(arb_exs), arb_q,
+            )
+            payload = json.dumps(
+                {
+                    "view": "arbitrage",
+                    "arb": filtered,
+                    "exchanges": exchanges,
+                    "active": {
+                        "arb_exchanges": sorted(arb_exs),
+                        "arb_quote": arb_q,
                     },
-                    separators=(",", ":"),
+                    "server_ts": server_ts,
+                },
+                separators=(",", ":"),
+            )
+            for state in group_clients:
+                try:
+                    await state.ws.send_str(payload)
+                except (ConnectionError, OSError):
+                    dead.append(id(state.ws))
+
+    # --- Alert check (fire-and-forget) ---
+    if alert_engine and alert_engine.enabled:
+        if arb_results is None:
+            arb_results = _compute_arbitrage(
+                all_tickers, registry, fees, arb_config,
+                mode="transfer",
+            )
+        asyncio.create_task(
+            alert_engine.check_and_alert(arb_results),
+        )
+
+    # --- Triangular broadcasts ---
+    if tri_groups:
+        taker_fees = {
+            ex: fees.taker_fee(ex) for ex in exchanges
+        } if fees else None
+        tri_cache: dict[str, list[dict]] = {}
+
+        for tri_ex, group_clients in tri_groups.items():
+            if tri_ex not in tri_cache:
+                tri_cache[tri_ex] = compute_triangular_all(
+                    all_tickers,
+                    taker_fees=taker_fees,
+                    exchange_filter=tri_ex,
                 )
-                for state in group_clients:
-                    try:
-                        await state.ws.send_str(payload)
-                    except (ConnectionError, OSError):
-                        dead.append(id(state.ws))
+            payload = json.dumps(
+                {
+                    "view": "triangular",
+                    "tri": tri_cache[tri_ex],
+                    "exchanges": exchanges,
+                    "active": {"tri_exchange": tri_ex},
+                    "server_ts": server_ts,
+                },
+                separators=(",", ":"),
+            )
+            for state in group_clients:
+                try:
+                    await state.ws.send_str(payload)
+                except (ConnectionError, OSError):
+                    dead.append(id(state.ws))
 
-            # --- Arbitrage broadcasts (compute once per mode, filter per group) ---
-            arb_by_mode: dict[str, list[dict[str, str | float]]] = {}
-            if arb_groups or metrics_clients or (alert_engine and alert_engine.enabled):
-                for (arb_mode, _arb_exs, _arb_q), _group_clients in arb_groups.items():
-                    if arb_mode not in arb_by_mode:
-                        arb_by_mode[arb_mode] = _compute_arbitrage(
-                            all_tickers, registry, fees, arb_config,
-                            mode=arb_mode,
-                        )
-                        if depth_probe:
-                            try:
-                                await depth_probe.enrich_arb_results(
-                                    arb_by_mode[arb_mode],
-                                    top_n=arb_config.depth_top_n,
-                                    trade_size=arb_config.ref_trade_size,
-                                    fees=fees,
-                                )
-                            except Exception:
-                                logger.debug(
-                                    "Depth enrichment failed", exc_info=True,
-                                )
+    # --- Metrics broadcasts ---
+    if metrics_clients:
+        metrics_data = metrics.get_metrics()
+        payload = json.dumps(
+            {
+                "view": "metrics",
+                "metrics": metrics_data,
+                "exchanges": exchanges,
+                "server_ts": server_ts,
+            },
+            separators=(",", ":"),
+        )
+        for state in metrics_clients:
+            try:
+                await state.ws.send_str(payload)
+            except (ConnectionError, OSError):
+                dead.append(id(state.ws))
 
-                # Record metrics from the default mode (transfer)
-                default_arb = arb_by_mode.get("transfer")
-                if default_arb is None:
-                    default_arb = _compute_arbitrage(
-                        all_tickers, registry, fees, arb_config,
-                        mode="transfer",
-                    )
-                    arb_by_mode["transfer"] = default_arb
-                metrics.record(default_arb)
-
-                # Enrich arb results with freq/dur
-                for mode_results in arb_by_mode.values():
-                    metrics.enrich_arb_results(mode_results)
-
-                for (arb_mode, arb_exs, arb_q), group_clients in arb_groups.items():
-                    filtered = _filter_arbitrage(
-                        arb_by_mode[arb_mode], list(arb_exs), arb_q,
-                    )
-                    payload = json.dumps(
-                        {
-                            "view": "arbitrage",
-                            "arb": filtered,
-                            "exchanges": exchanges,
-                            "active": {
-                                "arb_exchanges": sorted(arb_exs),
-                                "arb_quote": arb_q,
-                                "arb_mode": arb_mode,
-                            },
-                            "server_ts": server_ts,
-                        },
-                        separators=(",", ":"),
-                    )
-                    for state in group_clients:
-                        try:
-                            await state.ws.send_str(payload)
-                        except (ConnectionError, OSError):
-                            dead.append(id(state.ws))
-
-            # --- Alert check (fire-and-forget) ---
-            if alert_engine and alert_engine.enabled:
-                alert_mode = alert_engine._alert_mode
-                if alert_mode not in arb_by_mode:
-                    arb_by_mode[alert_mode] = _compute_arbitrage(
-                        all_tickers, registry, fees, arb_config,
-                        mode=alert_mode,
-                    )
-                asyncio.create_task(
-                    alert_engine.check_and_alert(arb_by_mode[alert_mode]),
-                )
-
-            # --- Triangular broadcasts ---
-            if tri_groups:
-                taker_fees = {
-                    ex: fees.taker_fee(ex) for ex in exchanges
-                } if fees else None
-                tri_cache: dict[str, list[dict]] = {}
-
-                for tri_ex, group_clients in tri_groups.items():
-                    if tri_ex not in tri_cache:
-                        tri_cache[tri_ex] = compute_triangular_all(
-                            all_tickers,
-                            taker_fees=taker_fees,
-                            exchange_filter=tri_ex,
-                        )
-                    payload = json.dumps(
-                        {
-                            "view": "triangular",
-                            "tri": tri_cache[tri_ex],
-                            "exchanges": exchanges,
-                            "active": {"tri_exchange": tri_ex},
-                            "server_ts": server_ts,
-                        },
-                        separators=(",", ":"),
-                    )
-                    for state in group_clients:
-                        try:
-                            await state.ws.send_str(payload)
-                        except (ConnectionError, OSError):
-                            dead.append(id(state.ws))
-
-            # --- Metrics broadcasts ---
-            if metrics_clients:
-                metrics_data = metrics.get_metrics()
-                payload = json.dumps(
-                    {
-                        "view": "metrics",
-                        "metrics": metrics_data,
-                        "exchanges": exchanges,
-                        "server_ts": server_ts,
-                    },
-                    separators=(",", ":"),
-                )
-                for state in metrics_clients:
-                    try:
-                        await state.ws.send_str(payload)
-                    except (ConnectionError, OSError):
-                        dead.append(id(state.ws))
-
-            for cid in dead:
-                clients.pop(cid, None)
-
-        await asyncio.sleep(config.broadcast_interval)
+    for cid in dead:
+        clients.pop(cid, None)
 
 
 async def _on_startup(app: web.Application) -> None:

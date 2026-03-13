@@ -207,7 +207,11 @@ class KucoinExchange(Exchange):
         """Parse KuCoin WS ticker message.
 
         topic: /market/ticker:BTC-USDT
-        data: {buy, sell, last, high, low, vol, volValue, changePrice, changeRate, ...}
+        WS data fields: {bestAsk, bestAskSize, bestBid, bestBidSize, price,
+                         sequence, size, time}
+
+        WS lacks: high, low, vol, volValue, changePrice, changeRate.
+        These are preserved from existing ticker (populated by REST).
         """
         topic = msg.get("topic", "")
         # Extract symbol from topic: /market/ticker:BTC-USDT → BTC-USDT
@@ -220,24 +224,26 @@ class KucoinExchange(Exchange):
 
         data = msg.get("data", {})
         symbol = kc_symbol.replace("-", "")
-        price = safe_float(data.get("last"))
-        change_price = safe_float(data.get("changePrice"))
-        change_rate = safe_float(data.get("changeRate"))
+        existing = self.tickers.get(symbol)
+
+        price = safe_float(data.get("price"))
+        bid = safe_float(data.get("bestBid"))
+        ask = safe_float(data.get("bestAsk"))
 
         self.tickers[symbol] = Ticker(
             symbol=symbol,
             base_asset=info["base"],
             quote_asset=info["quote"],
             price=price,
-            price_change=change_price,
-            price_change_pct=change_rate * 100,
-            high_24h=safe_float(data.get("high")),
-            low_24h=safe_float(data.get("low")),
-            volume_base=safe_float(data.get("vol")),
-            volume_quote=safe_float(data.get("volValue")),
-            bid=safe_float(data.get("buy")),
-            ask=safe_float(data.get("sell")),
-            open_price=safe_float(data.get("open")),
+            price_change=existing.price_change if existing else 0.0,
+            price_change_pct=existing.price_change_pct if existing else 0.0,
+            high_24h=existing.high_24h if existing else 0.0,
+            low_24h=existing.low_24h if existing else 0.0,
+            volume_base=existing.volume_base if existing else 0.0,
+            volume_quote=existing.volume_quote if existing else 0.0,
+            bid=bid,
+            ask=ask,
+            open_price=existing.open_price if existing else 0.0,
             trades_count=0,
             last_update=datetime.now(),
             exchange=self.name,
@@ -247,10 +253,14 @@ class KucoinExchange(Exchange):
     # --- REST fallback ---
 
     async def _poll_fallback(self) -> None:
+        """REST polling — always active as primary data source.
+
+        KuCoin WS /market/ticker:all only provides price/bid/ask.
+        REST fills in high, low, volume, change data.
+        """
         while self._running:
             try:
-                if self._ws_failures >= self.config.ws_max_failures and not self._ws_connected:
-                    await self._fetch_tickers()
+                await self._fetch_tickers()
             except aiohttp.ClientError as e:
                 logger.warning("KuCoin REST fallback error: %s", e)
             except asyncio.CancelledError:

@@ -165,16 +165,29 @@ class BybitExchange(Exchange):
         )
 
     def _process_ws_ticker(self, data: dict[str, str]) -> None:
-        """Parse a single Bybit WebSocket ticker update."""
+        """Parse a single Bybit WebSocket ticker update.
+
+        Bybit SPOT WS tickers topic may not include bid1Price/ask1Price.
+        Preserve existing bid/ask from REST when WS doesn't provide them.
+        """
         now = datetime.now()
         symbol = data.get("symbol", "")
         info = self._symbol_info.get(symbol)
         if not info:
             return
 
+        existing = self.tickers.get(symbol)
         price = safe_float(data.get("lastPrice"))
         prev_price = safe_float(data.get("prevPrice24h"))
         pct_raw = safe_float(data.get("price24hPcnt"))
+        bid = safe_float(data.get("bid1Price"))
+        ask = safe_float(data.get("ask1Price"))
+
+        # WS may omit bid/ask — preserve values from REST
+        if not bid and existing:
+            bid = existing.bid
+        if not ask and existing:
+            ask = existing.ask
 
         self.tickers[symbol] = Ticker(
             symbol=symbol,
@@ -187,8 +200,8 @@ class BybitExchange(Exchange):
             low_24h=safe_float(data.get("lowPrice24h")),
             volume_base=safe_float(data.get("volume24h")),
             volume_quote=safe_float(data.get("turnover24h")),
-            bid=safe_float(data.get("bid1Price")),
-            ask=safe_float(data.get("ask1Price")),
+            bid=bid,
+            ask=ask,
             open_price=prev_price,
             trades_count=0,
             last_update=now,
@@ -199,11 +212,14 @@ class BybitExchange(Exchange):
     # --- REST fallback ---
 
     async def _poll_fallback(self) -> None:
-        """REST polling — only active when WS is down past max failures."""
+        """REST polling — always active to ensure bid/ask are populated.
+
+        Bybit SPOT WS may omit bid1Price/ask1Price, so REST runs
+        continuously to provide complete ticker data.
+        """
         while self._running:
             try:
-                if self._ws_failures >= self.config.ws_max_failures and not self._ws_connected:
-                    await self._fetch_tickers()
+                await self._fetch_tickers()
             except aiohttp.ClientError as e:
                 logger.warning("Bybit REST fallback error: %s", e)
             except asyncio.CancelledError:

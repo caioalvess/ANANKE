@@ -21,9 +21,13 @@ cross-validate that a symbol on an exchange matches the CoinGecko entry.
 Resolution tiers (per exchange, per symbol):
 
   1. Globally confirmed — symbol is unique in CoinGecko (1 entry only)
-     OR the dominant coin is a top blue-chip.  Confirmed on ALL exchanges
+     OR the dominant coin is a top-50 blue-chip.  Confirmed on ALL exchanges
      UNLESS an exchange's own name contradicts the CoinGecko name
      (exchange_blocked).
+
+  1b. Dominant coin — multi-entry symbol where one coin's market cap
+      dominates (≥100x runner-up, or ≥10x AND >$10M).  Globally confirmed
+      with cross-validation.
 
   2. KuCoin confirmed — multi-entry symbol where KuCoin's fullName
      matches exactly one CoinGecko entry name.  Confirmed on KuCoin ONLY.
@@ -61,6 +65,12 @@ _GATEIO_CURRENCY_PAIRS = "https://api.gateio.ws/api/v4/spot/currency_pairs"
 # their symbol has multiple CoinGecko entries.  Top-50 = absolute blue
 # chips where no CEX would ever list a different token under that symbol.
 _BLUE_CHIP_RANK = 50
+
+# Dominant coin tier: fetch top 300 by market cap for dominance analysis.
+# If one entry's market cap is ≥100x the runner-up → dominant.
+# If ≥10x AND >$10M → dominant.
+_DOMINANT_RANK = 300
+_DOMINANT_MIN_CAP = 10_000_000  # $10M minimum for 10x rule
 
 _CACHE_DIR = Path.home() / ".ananke"
 _CACHE_FILE = _CACHE_DIR / "coin_registry.json"
@@ -210,35 +220,63 @@ async def _fetch_coins_list(session: aiohttp.ClientSession) -> list[dict]:
     return []
 
 
-async def _fetch_blue_chips(
+async def _fetch_market_caps(
     session: aiohttp.ClientSession,
-    count: int = _BLUE_CHIP_RANK,
-) -> set[str]:
-    """Fetch top coins by market cap. Returns set of CoinGecko IDs."""
-    params = {
-        "vs_currency": "usd",
-        "order": "market_cap_desc",
-        "per_page": str(count),
-        "page": "1",
-    }
-    retries = 0
-    while retries < 3:
-        async with session.get(_COINGECKO_COINS_MARKETS, params=params) as resp:
-            if resp.status == 429:
-                retries += 1
-                wait = int(resp.headers.get("Retry-After", 5))
-                logger.warning(
-                    "CoinGecko rate limited, retry %d/3 in %ds", retries, wait,
-                )
-                await asyncio.sleep(wait)
-                continue
-            if resp.status != 200:
-                logger.warning("CoinGecko /coins/markets returned %d", resp.status)
-                return set()
-            data = await resp.json()
-            return {c["id"] for c in data if c.get("id")}
-    logger.warning("CoinGecko rate limit exhausted for /coins/markets")
-    return set()
+    count: int = _DOMINANT_RANK,
+) -> dict[str, float]:
+    """Fetch top coins by market cap. Returns {coingecko_id: market_cap_usd}.
+
+    Paginated: CoinGecko free API allows max 250 per page.
+    """
+    result: dict[str, float] = {}
+    pages = [(1, min(count, 250))]
+    if count > 250:
+        pages.append((2, count - 250))
+
+    for page, per_page in pages:
+        params = {
+            "vs_currency": "usd",
+            "order": "market_cap_desc",
+            "per_page": str(per_page),
+            "page": str(page),
+        }
+        retries = 0
+        success = False
+        while retries < 3:
+            async with session.get(_COINGECKO_COINS_MARKETS, params=params) as resp:
+                if resp.status == 429:
+                    retries += 1
+                    wait = int(resp.headers.get("Retry-After", 5))
+                    logger.warning(
+                        "CoinGecko rate limited, retry %d/3 in %ds",
+                        retries, wait,
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                if resp.status != 200:
+                    logger.warning(
+                        "CoinGecko /coins/markets page %d returned %d",
+                        page, resp.status,
+                    )
+                    return result
+                data = await resp.json()
+                for c in data:
+                    cid = c.get("id")
+                    cap = c.get("market_cap")
+                    if cid and cap is not None:
+                        result[cid] = float(cap)
+                success = True
+                break
+        if not success:
+            logger.warning(
+                "CoinGecko rate limit exhausted for /coins/markets page %d",
+                page,
+            )
+            return result
+        if page < len(pages):
+            await asyncio.sleep(1.5)
+
+    return result
 
 
 async def _fetch_kucoin_fullnames(
@@ -324,7 +362,7 @@ def _names_match(name_a: str, name_b: str) -> bool:
 
 def _build_mappings(
     coins_list: list[dict],
-    blue_chip_ids: set[str],
+    market_caps: dict[str, float],
     kucoin_names: dict[str, str],
     gateio_names: dict[str, str] | None = None,
 ) -> CoinRegistry:
@@ -333,10 +371,12 @@ def _build_mappings(
     Strategy:
     1. Group CoinGecko coins by uppercase symbol.
     2. Unique symbol (1 coin) -> globally confirmed.
-    3. Multiple coins, exactly 1 is a blue chip -> globally confirmed.
-    4. Multiple coins, KuCoin fullName matches exactly 1 name -> KuCoin confirmed.
-    5. Otherwise -> ambiguous (blocked from cross-exchange arbitrage).
-    6. Cross-validate: for globally confirmed symbols, verify exchange-provided
+    3. Multiple coins, exactly 1 is a top-50 blue chip -> globally confirmed.
+    4. Multiple coins, one dominates by market cap (100x or 10x+$10M) ->
+       globally confirmed ("dominant coin" tier).
+    5. Multiple coins, KuCoin fullName matches exactly 1 name -> KuCoin confirmed.
+    6. Otherwise -> ambiguous (blocked from cross-exchange arbitrage).
+    7. Cross-validate: for globally confirmed symbols, verify exchange-provided
        names match CoinGecko name.  Mismatch -> block on that exchange only.
     """
     # Group by symbol: {SYMBOL: [{id, name}, ...]}
@@ -353,10 +393,16 @@ def _build_mappings(
     kucoin_confirmed: dict[str, str] = {}
     ambiguous: set[str] = set()
 
-    # CoinGecko name for symbols confirmed via "unique" path only.
+    # CoinGecko name for symbols confirmed via "unique" or "dominant" path.
     # Blue chips skip cross-validation — no exchange would list a
     # different token under BTC/ETH/SOL/etc.
     crossval_names: dict[str, str] = {}
+
+    # Derive blue chip IDs (top 50 by market cap)
+    sorted_caps = sorted(market_caps.items(), key=lambda x: x[1], reverse=True)
+    blue_chip_ids = {cid for cid, _ in sorted_caps[:_BLUE_CHIP_RANK]}
+
+    dominant_count = 0
 
     for sym, entries in by_symbol.items():
         if len(entries) == 1:
@@ -371,6 +417,36 @@ def _build_mappings(
             # Exactly one is a top blue chip — trusted, no cross-validation
             global_confirmed[sym] = blue_hits[0]["id"]
             continue
+
+        # Dominant coin tier — market cap dominance analysis
+        caps_with_data = [
+            (e, market_caps[e["id"]])
+            for e in entries
+            if e["id"] in market_caps and market_caps[e["id"]] > 0
+        ]
+        if caps_with_data:
+            caps_with_data.sort(key=lambda x: x[1], reverse=True)
+            top_entry, top_cap = caps_with_data[0]
+            runner_up_cap = (
+                caps_with_data[1][1] if len(caps_with_data) >= 2 else 0.0
+            )
+
+            dominant = False
+            if runner_up_cap == 0:
+                # Only one entry has market cap data — dominant if significant
+                dominant = top_cap >= _DOMINANT_MIN_CAP
+            else:
+                ratio = top_cap / runner_up_cap
+                dominant = (
+                    ratio >= 100
+                    or (ratio >= 10 and top_cap >= _DOMINANT_MIN_CAP)
+                )
+
+            if dominant:
+                global_confirmed[sym] = top_entry["id"]
+                crossval_names[sym] = top_entry["name"]
+                dominant_count += 1
+                continue
 
         # Not globally resolvable — try KuCoin fullName matching
         kc_name = kucoin_names.get(sym, "")
@@ -387,6 +463,11 @@ def _build_mappings(
 
         # Truly ambiguous — blocked everywhere
         ambiguous.add(sym)
+
+    if dominant_count:
+        logger.info(
+            "Dominant coin tier resolved %d symbols", dominant_count,
+        )
 
     # --- Cross-validate exchange names against CoinGecko ---
     # For globally confirmed symbols, if an exchange provides a name that
@@ -425,11 +506,11 @@ def _build_mappings(
 async def build_registry() -> CoinRegistry:
     """Build the canonical coin registry.
 
-    Data sources (4 API calls at startup, cached 24h):
+    Data sources (5 API calls at startup, cached 24h):
     1. CoinGecko /coins/list — full coin catalog (id, symbol, name)
-    2. CoinGecko /coins/markets — top blue chips by market cap
-    3. KuCoin /api/v1/currencies — fullName for listed currencies
-    4. Gate.io /api/v4/spot/currency_pairs — base_name for listed pairs
+    2-3. CoinGecko /coins/markets — top 300 by market cap (2 pages)
+    4. KuCoin /api/v1/currencies — fullName for listed currencies
+    5. Gate.io /api/v4/spot/currency_pairs — base_name for listed pairs
 
     Exchange names are cross-validated against CoinGecko names to detect
     cases where an exchange lists a different token under the same symbol.
@@ -452,8 +533,8 @@ async def build_registry() -> CoinRegistry:
 
             await asyncio.sleep(1.5)
 
-            # Fetch blue chips (1 call, top-50)
-            blue_chip_ids = await _fetch_blue_chips(session)
+            # Fetch market caps (top 300, paginated — for blue chip + dominant tiers)
+            market_caps = await _fetch_market_caps(session)
 
             # Fetch exchange names concurrently (independent APIs)
             kucoin_names, gateio_names = await asyncio.gather(
@@ -468,7 +549,7 @@ async def build_registry() -> CoinRegistry:
         return CoinRegistry.empty()
 
     registry = _build_mappings(
-        coins_list, blue_chip_ids, kucoin_names, gateio_names,
+        coins_list, market_caps, kucoin_names, gateio_names,
     )
     logger.info(
         "Built coin registry: %d global, %d kucoin-only, %d ambiguous, "

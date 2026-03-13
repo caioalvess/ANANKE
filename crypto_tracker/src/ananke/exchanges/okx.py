@@ -88,6 +88,8 @@ class OkxExchange(Exchange):
 
     # --- WebSocket ---
 
+    _SUBSCRIBE_BATCH = 100  # OKX allows multiple args per subscribe
+
     async def _ws_listen(self) -> None:
         """WebSocket listener with auto-reconnect and backoff."""
         cfg = self.config
@@ -103,11 +105,8 @@ class OkxExchange(Exchange):
                     self._ws_connected = True
                     self._ws_failures = 0
 
-                    # Subscribe to all SPOT tickers
-                    await ws.send(json.dumps({
-                        "op": "subscribe",
-                        "args": [{"channel": "tickers", "instType": "SPOT"}],
-                    }))
+                    # Subscribe per-instrument in batches (instType not supported)
+                    await self._subscribe_all(ws)
 
                     async for raw in ws:
                         if not self._running:
@@ -132,6 +131,20 @@ class OkxExchange(Exchange):
                 break
 
         self._ws_connected = False
+
+    async def _subscribe_all(self, ws: object) -> None:
+        """Subscribe to tickers per-instrument in batches."""
+        inst_ids = list(self._symbol_info.keys())
+        for i in range(0, len(inst_ids), self._SUBSCRIBE_BATCH):
+            batch = inst_ids[i:i + self._SUBSCRIBE_BATCH]
+            args = [{"channel": "tickers", "instId": iid} for iid in batch]
+            await ws.send(json.dumps({"op": "subscribe", "args": args}))
+
+        logger.info(
+            "OKX: subscribed to %d symbols in %d batches",
+            len(inst_ids),
+            (len(inst_ids) + self._SUBSCRIBE_BATCH - 1) // self._SUBSCRIBE_BATCH,
+        )
 
     def _process_ws_tickers(self, data: list[dict[str, str]]) -> None:
         """Parse OKX WebSocket ticker push."""
@@ -171,11 +184,14 @@ class OkxExchange(Exchange):
     # --- REST fallback ---
 
     async def _poll_fallback(self) -> None:
-        """REST polling — only active when WS is down past max failures."""
+        """REST polling — always active as primary data source.
+
+        OKX WS requires per-instrument subscription and may be slow to
+        deliver initial snapshots. REST ensures complete data availability.
+        """
         while self._running:
             try:
-                if self._ws_failures >= self.config.ws_max_failures and not self._ws_connected:
-                    await self._fetch_tickers()
+                await self._fetch_tickers()
             except aiohttp.ClientError as e:
                 logger.warning("OKX REST fallback error: %s", e)
             except asyncio.CancelledError:

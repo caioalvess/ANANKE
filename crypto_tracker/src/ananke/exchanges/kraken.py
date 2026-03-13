@@ -160,18 +160,22 @@ class KrakenExchange(Exchange):
                     self._ws_connected = True
                     self._ws_failures = 0
 
-                    # Subscribe to ticker for all symbols
+                    # Subscribe to ticker in batches to avoid oversized messages
                     if self._ws_symbols:
-                        await ws.send(json.dumps({
-                            "method": "subscribe",
-                            "params": {
-                                "channel": "ticker",
-                                "symbol": self._ws_symbols,
-                            },
-                        }))
+                        batch_size = 100
+                        for i in range(0, len(self._ws_symbols), batch_size):
+                            batch = self._ws_symbols[i:i + batch_size]
+                            await ws.send(json.dumps({
+                                "method": "subscribe",
+                                "params": {
+                                    "channel": "ticker",
+                                    "symbol": batch,
+                                },
+                            }))
                         logger.info(
-                            "Kraken: subscribed to %d ticker symbols",
+                            "Kraken: subscribed to %d ticker symbols in %d batches",
                             len(self._ws_symbols),
+                            (len(self._ws_symbols) + batch_size - 1) // batch_size,
                         )
 
                     async for raw in ws:
@@ -247,10 +251,14 @@ class KrakenExchange(Exchange):
     # --- REST fallback ---
 
     async def _poll_fallback(self) -> None:
+        """REST polling — always active as primary data source.
+
+        Kraken WS v2 with 1400+ symbols can be unstable. REST ensures
+        data availability regardless of WS connection state.
+        """
         while self._running:
             try:
-                if self._ws_failures >= self.config.ws_max_failures and not self._ws_connected:
-                    await self._fetch_tickers()
+                await self._fetch_tickers()
             except aiohttp.ClientError as e:
                 logger.warning("Kraken REST fallback error: %s", e)
             except asyncio.CancelledError:

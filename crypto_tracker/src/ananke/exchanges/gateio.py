@@ -166,7 +166,8 @@ class GateioExchange(Exchange):
         symbol = pair_id.replace("_", "")
         price = safe_float(data.get("last"))
         change_pct = safe_float(data.get("change_percentage"))
-        open_price = price / (1 + change_pct / 100) if change_pct != 0 else price
+        denom = 1 + change_pct / 100
+        open_price = price / denom if denom != 0 else price
         price_change = price - open_price
 
         self.tickers[symbol] = Ticker(
@@ -225,7 +226,8 @@ class GateioExchange(Exchange):
             high = safe_float(item.get("high_24h"))
             low = safe_float(item.get("low_24h"))
 
-            open_price = price / (1 + change_pct / 100) if change_pct != 0 else price
+            denom = 1 + change_pct / 100
+            open_price = price / denom if denom != 0 else price
             price_change = price - open_price
 
             self.tickers[symbol] = Ticker(

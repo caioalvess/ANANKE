@@ -149,6 +149,10 @@ class AlertEngine:
     def enabled(self) -> bool:
         return bool(self._token and self._chat_id)
 
+    @property
+    def alert_mode(self) -> str:
+        return self._alert_mode
+
     def _profit_field(self) -> str:
         """Which profit field to evaluate based on alert_mode."""
         return "npf" if self._alert_mode == "hedge" else "tnpf"

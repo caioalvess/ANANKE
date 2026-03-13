@@ -19,9 +19,14 @@ because its impact depends on trade size:
 """
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import time
+from datetime import datetime, timezone
+from os import environ
 from pathlib import Path
 
 import aiohttp
@@ -40,7 +45,7 @@ _DEFAULT_TAKER: dict[str, float] = {
     "Binance": 0.001,    # 0.10%
     "Bybit": 0.001,      # 0.10%
     "OKX": 0.001,        # 0.10%
-    "Kraken": 0.004,     # 0.40%
+    "Kraken": 0.0026,    # 0.26% (Pro, lowest tier)
     "KuCoin": 0.001,     # 0.10%
     "Gate.io": 0.002,    # 0.20%
 }
@@ -225,11 +230,12 @@ def _safe_float(val: object) -> float:
         return 0.0
 
 
-class _KucoinCurrencyData:
-    """Parsed KuCoin /api/v3/currencies data."""
-    __slots__ = ("fees", "withdraw_blocked", "deposit_blocked")
+class _CurrencyData:
+    """Parsed currency data from an exchange (fees + transfer status)."""
+    __slots__ = ("exchange", "fees", "withdraw_blocked", "deposit_blocked")
 
-    def __init__(self) -> None:
+    def __init__(self, exchange: str) -> None:
+        self.exchange = exchange
         self.fees: dict[str, float] = {}
         self.withdraw_blocked: set[tuple[str, str]] = set()
         self.deposit_blocked: set[tuple[str, str]] = set()
@@ -237,15 +243,15 @@ class _KucoinCurrencyData:
 
 async def _fetch_kucoin_currency_data(
     session: aiohttp.ClientSession,
-) -> _KucoinCurrencyData:
+) -> _CurrencyData:
     """Fetch withdrawal fees + transfer status from KuCoin /api/v3/currencies.
 
     Returns fees {SYMBOL: cheapest_withdrawal_fee} and sets of
     (exchange, SYMBOL) pairs where withdraw/deposit is fully blocked
     (all chains disabled).
     """
-    result = _KucoinCurrencyData()
-    exchange = "KuCoin"
+    result = _CurrencyData("KuCoin")
+    exchange = result.exchange
 
     retries = 0
     while retries < 3:
@@ -525,6 +531,282 @@ async def _fetch_kraken_transfer_status(
 
 
 # ---------------------------------------------------------------------------
+# OKX transfer status + withdrawal fees (requires API key)
+# ---------------------------------------------------------------------------
+
+_OKX_CURRENCIES = "https://www.okx.com/api/v5/asset/currencies"
+
+
+def _okx_sign(secret: str, timestamp: str, method: str, path: str) -> str:
+    """Generate OKX API signature (base64 HMAC-SHA256)."""
+    prehash = f"{timestamp}{method}{path}"
+    mac = hmac.new(secret.encode(), prehash.encode(), hashlib.sha256)
+    return base64.b64encode(mac.digest()).decode()
+
+
+async def _fetch_okx_currency_data(
+    session: aiohttp.ClientSession,
+) -> _CurrencyData:
+    """Fetch transfer status + withdrawal fees from OKX /api/v5/asset/currencies.
+
+    Requires env vars: ANANKE_OKX_API_KEY, ANANKE_OKX_API_SECRET, ANANKE_OKX_PASSPHRASE.
+    Returns empty data if keys are not configured.
+    """
+    result = _CurrencyData("OKX")
+
+    api_key = environ.get("ANANKE_OKX_API_KEY", "")
+    api_secret = environ.get("ANANKE_OKX_API_SECRET", "")
+    passphrase = environ.get("ANANKE_OKX_PASSPHRASE", "")
+
+    if not all([api_key, api_secret, passphrase]):
+        logger.debug("OKX API keys not configured — skipping transfer status")
+        return result
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    signature = _okx_sign(api_secret, timestamp, "GET", "/api/v5/asset/currencies")
+
+    headers = {
+        "OK-ACCESS-KEY": api_key,
+        "OK-ACCESS-SIGN": signature,
+        "OK-ACCESS-TIMESTAMP": timestamp,
+        "OK-ACCESS-PASSPHRASE": passphrase,
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with session.get(_OKX_CURRENCIES, headers=headers) as resp:
+            if resp.status != 200:
+                logger.warning("OKX /currencies returned %d", resp.status)
+                return result
+            data = await resp.json()
+    except Exception:
+        logger.warning("OKX /currencies unreachable", exc_info=True)
+        return result
+
+    if data.get("code") != "0":
+        logger.warning("OKX /currencies error: %s", data.get("msg"))
+        return result
+
+    # Group chains by currency
+    coin_chains: dict[str, list[dict]] = {}
+    for item in data.get("data", []):
+        ccy = item.get("ccy", "").upper()
+        if ccy:
+            coin_chains.setdefault(ccy, []).append(item)
+
+    exchange = result.exchange
+    for sym, chains in coin_chains.items():
+        any_withdraw = any(chain.get("canWd") for chain in chains)
+        any_deposit = any(chain.get("canDep") for chain in chains)
+
+        fees = []
+        for chain in chains:
+            if chain.get("canWd"):
+                fee = _safe_float(chain.get("minFee"))
+                if fee > 0:
+                    fees.append(fee)
+
+        if fees:
+            result.fees[sym] = min(fees)
+        if not any_withdraw:
+            result.withdraw_blocked.add((exchange, sym))
+        if not any_deposit:
+            result.deposit_blocked.add((exchange, sym))
+
+    logger.info(
+        "OKX: %d withdrawal fees, %d withdraw-blocked, %d deposit-blocked",
+        len(result.fees),
+        len(result.withdraw_blocked),
+        len(result.deposit_blocked),
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Binance transfer status + withdrawal fees (requires API key)
+# ---------------------------------------------------------------------------
+
+_BINANCE_CAPITAL_CONFIG = "https://api.binance.com/sapi/v1/capital/config/getall"
+
+
+def _binance_sign(secret: str, query_string: str) -> str:
+    """Generate Binance API signature (HMAC-SHA256 hex)."""
+    return hmac.new(
+        secret.encode(), query_string.encode(), hashlib.sha256,
+    ).hexdigest()
+
+
+async def _fetch_binance_currency_data(
+    session: aiohttp.ClientSession,
+) -> _CurrencyData:
+    """Fetch transfer status + withdrawal fees from Binance /sapi/v1/capital/config/getall.
+
+    Requires env vars: ANANKE_BINANCE_API_KEY, ANANKE_BINANCE_API_SECRET.
+    Returns empty data if keys are not configured.
+    """
+    result = _CurrencyData("Binance")
+
+    api_key = environ.get("ANANKE_BINANCE_API_KEY", "")
+    api_secret = environ.get("ANANKE_BINANCE_API_SECRET", "")
+
+    if not all([api_key, api_secret]):
+        logger.debug("Binance API keys not configured — skipping transfer status")
+        return result
+
+    timestamp_ms = str(int(time.time() * 1000))
+    query_string = f"timestamp={timestamp_ms}"
+    signature = _binance_sign(api_secret, query_string)
+    url = f"{_BINANCE_CAPITAL_CONFIG}?{query_string}&signature={signature}"
+
+    headers = {"X-MBX-APIKEY": api_key}
+
+    try:
+        async with session.get(url, headers=headers) as resp:
+            if resp.status != 200:
+                body = await resp.text()
+                logger.warning("Binance /capital/config returned %d: %s", resp.status, body[:200])
+                return result
+            data = await resp.json()
+    except Exception:
+        logger.warning("Binance /capital/config unreachable", exc_info=True)
+        return result
+
+    exchange = result.exchange
+    for coin_info in data:
+        sym = coin_info.get("coin", "").upper()
+        if not sym:
+            continue
+
+        networks = coin_info.get("networkList", [])
+        any_withdraw = False
+        any_deposit = False
+        fees = []
+
+        for net in networks:
+            if net.get("withdrawEnable"):
+                any_withdraw = True
+                fee = _safe_float(net.get("withdrawFee"))
+                if fee > 0:
+                    fees.append(fee)
+            if net.get("depositEnable"):
+                any_deposit = True
+
+        if fees:
+            result.fees[sym] = min(fees)
+        if not any_withdraw:
+            result.withdraw_blocked.add((exchange, sym))
+        if not any_deposit:
+            result.deposit_blocked.add((exchange, sym))
+
+    logger.info(
+        "Binance: %d withdrawal fees, %d withdraw-blocked, %d deposit-blocked",
+        len(result.fees),
+        len(result.withdraw_blocked),
+        len(result.deposit_blocked),
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Bybit transfer status + withdrawal fees (requires API key)
+# ---------------------------------------------------------------------------
+
+_BYBIT_COIN_INFO = "https://api.bybit.com/v5/asset/coin/query-info"
+
+
+def _bybit_sign(
+    secret: str, timestamp_ms: str, api_key: str, recv_window: str,
+    query_string: str = "",
+) -> str:
+    """Generate Bybit v5 API signature (HMAC-SHA256 hex)."""
+    param_str = f"{timestamp_ms}{api_key}{recv_window}{query_string}"
+    return hmac.new(
+        secret.encode(), param_str.encode(), hashlib.sha256,
+    ).hexdigest()
+
+
+async def _fetch_bybit_currency_data(
+    session: aiohttp.ClientSession,
+) -> _CurrencyData:
+    """Fetch transfer status + withdrawal fees from Bybit /v5/asset/coin/query-info.
+
+    Requires env vars: ANANKE_BYBIT_API_KEY, ANANKE_BYBIT_API_SECRET.
+    Returns empty data if keys are not configured.
+    """
+    result = _CurrencyData("Bybit")
+
+    api_key = environ.get("ANANKE_BYBIT_API_KEY", "")
+    api_secret = environ.get("ANANKE_BYBIT_API_SECRET", "")
+
+    if not all([api_key, api_secret]):
+        logger.debug("Bybit API keys not configured — skipping transfer status")
+        return result
+
+    timestamp_ms = str(int(time.time() * 1000))
+    recv_window = "5000"
+    signature = _bybit_sign(api_secret, timestamp_ms, api_key, recv_window)
+
+    headers = {
+        "X-BAPI-API-KEY": api_key,
+        "X-BAPI-SIGN": signature,
+        "X-BAPI-TIMESTAMP": timestamp_ms,
+        "X-BAPI-RECV-WINDOW": recv_window,
+    }
+
+    try:
+        async with session.get(_BYBIT_COIN_INFO, headers=headers) as resp:
+            if resp.status != 200:
+                body = await resp.text()
+                logger.warning("Bybit /coin/query-info returned %d: %s", resp.status, body[:200])
+                return result
+            data = await resp.json()
+    except Exception:
+        logger.warning("Bybit /coin/query-info unreachable", exc_info=True)
+        return result
+
+    ret_code = data.get("retCode")
+    if ret_code != 0:
+        logger.warning("Bybit /coin/query-info error %s: %s", ret_code, data.get("retMsg"))
+        return result
+
+    exchange = result.exchange
+    for row in data.get("result", {}).get("rows", []):
+        sym = row.get("coin", "").upper()
+        if not sym:
+            continue
+
+        chains = row.get("chains", [])
+        any_withdraw = False
+        any_deposit = False
+        fees = []
+
+        for ch in chains:
+            # Bybit uses "1" for enabled, "0" for disabled
+            if str(ch.get("chainDeposit")) == "1":
+                any_deposit = True
+            if str(ch.get("chainWithdraw")) == "1":
+                any_withdraw = True
+                fee = _safe_float(ch.get("withdrawFee"))
+                if fee > 0:
+                    fees.append(fee)
+
+        if fees:
+            result.fees[sym] = min(fees)
+        if not any_withdraw:
+            result.withdraw_blocked.add((exchange, sym))
+        if not any_deposit:
+            result.deposit_blocked.add((exchange, sym))
+
+    logger.info(
+        "Bybit: %d withdrawal fees, %d withdraw-blocked, %d deposit-blocked",
+        len(result.fees),
+        len(result.withdraw_blocked),
+        len(result.deposit_blocked),
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
 
@@ -533,17 +815,18 @@ async def build_fee_registry() -> FeeRegistry:
     """Build the fee registry.
 
     Withdrawal fee sources (cached 24h):
-      1. KuCoin /api/v3/currencies — primary (1 API call, ~2k coins)
+      1. Per-exchange APIs (KuCoin, OKX, Binance, Bybit) — per-chain fees
       2. withdrawalfees.com — fallback for missing symbols (~32 pages)
 
     Transfer status sources (same cache):
-      - KuCoin /api/v3/currencies — per-chain isWithdrawEnabled/isDepositEnabled
-      - Gate.io /api/v4/spot/currencies — withdraw_disabled/deposit_disabled
-      - Kraken /0/public/Assets — status (enabled/deposit_only/withdrawal_only/disabled)
+      - KuCoin /api/v3/currencies — per-chain (public, no key)
+      - Gate.io /api/v4/spot/currencies — per-coin (public, no key)
+      - Kraken /0/public/Assets — per-asset status (public, no key)
+      - OKX /api/v5/asset/currencies — per-chain (requires API key)
+      - Binance /sapi/v1/capital/config/getall — per-network (requires API key)
+      - Bybit /v5/asset/coin/query-info — per-chain (requires API key)
 
-    KuCoin data takes priority; withdrawalfees.com fills gaps only.
     Taker fees are hardcoded defaults per exchange.
-
     On failure returns a registry with default taker fees and
     no withdrawal data (withdrawal fees treated as zero).
     """
@@ -559,28 +842,42 @@ async def build_fee_registry() -> FeeRegistry:
     try:
         timeout = aiohttp.ClientTimeout(total=120)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            # KuCoin + Gate.io + Kraken transfer status concurrently
-            kucoin_data, (gateio_wb, gateio_db), (kraken_wb, kraken_db) = (
-                await asyncio.gather(
-                    _fetch_kucoin_currency_data(session),
-                    _fetch_gateio_transfer_status(session),
-                    _fetch_kraken_transfer_status(session),
-                )
+            # All exchange currency data fetchers concurrently
+            (
+                kucoin_data,
+                (gateio_wb, gateio_db),
+                (kraken_wb, kraken_db),
+                okx_data,
+                binance_data,
+                bybit_data,
+            ) = await asyncio.gather(
+                _fetch_kucoin_currency_data(session),
+                _fetch_gateio_transfer_status(session),
+                _fetch_kraken_transfer_status(session),
+                _fetch_okx_currency_data(session),
+                _fetch_binance_currency_data(session),
+                _fetch_bybit_currency_data(session),
             )
 
-            # KuCoin fees → per-exchange keyed
-            for sym, fee in kucoin_data.fees.items():
-                withdrawal[("KuCoin", sym)] = fee
+            # Collect per-exchange withdrawal fees
+            for cd in (kucoin_data, okx_data, binance_data, bybit_data):
+                for sym, fee in cd.fees.items():
+                    withdrawal[(cd.exchange, sym)] = fee
+                all_withdraw_blocked.update(cd.withdraw_blocked)
+                all_deposit_blocked.update(cd.deposit_blocked)
 
-            all_withdraw_blocked.update(kucoin_data.withdraw_blocked)
-            all_deposit_blocked.update(kucoin_data.deposit_blocked)
+            # Gate.io + Kraken return (blocked, blocked) tuples
             all_withdraw_blocked.update(gateio_wb)
             all_deposit_blocked.update(gateio_db)
             all_withdraw_blocked.update(kraken_wb)
             all_deposit_blocked.update(kraken_db)
 
-            # Fallback: KuCoin fees as generic + withdrawalfees.com
-            fallback_withdrawal.update(kucoin_data.fees)
+            # Fallback fees: merge all exchange fees → generic fallback
+            # Priority: KuCoin > OKX > Binance > Bybit
+            for cd in (bybit_data, binance_data, okx_data, kucoin_data):
+                fallback_withdrawal.update(cd.fees)
+
+            # withdrawalfees.com fills remaining gaps
             wfees = await _fetch_wfees_fallback(session)
             fallback_count = 0
             for sym, fee in wfees.items():
@@ -588,11 +885,18 @@ async def build_fee_registry() -> FeeRegistry:
                     fallback_withdrawal[sym] = fee
                     fallback_count += 1
 
-            logger.info(
-                "Withdrawal fees: %d from KuCoin, %d from withdrawalfees.com",
-                len(kucoin_data.fees),
-                fallback_count,
-            )
+            # Log coverage summary
+            sources = []
+            for label, cd in [
+                ("KuCoin", kucoin_data), ("OKX", okx_data),
+                ("Binance", binance_data), ("Bybit", bybit_data),
+            ]:
+                if cd.fees:
+                    sources.append(f"{len(cd.fees)} from {label}")
+            if fallback_count:
+                sources.append(f"{fallback_count} from withdrawalfees.com")
+            logger.info("Withdrawal fees: %s", ", ".join(sources) or "none")
+
     except Exception:
         logger.warning(
             "Fee data unreachable — using defaults", exc_info=True,
