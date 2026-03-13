@@ -40,6 +40,7 @@ class ClientState:
     # Arbitrage view filters (multi-select: empty = ALL)
     arb_exchanges: list[str] = field(default_factory=list)
     arb_quote: str = "ALL"
+    arb_mode: str = "transfer"  # "transfer" or "hedge"
 
 
 def _serialize_ticker(t: Ticker) -> dict[str, str | int | float]:
@@ -91,6 +92,8 @@ def _compute_arbitrage(
     registry: CoinRegistry | None = None,
     fees: FeeRegistry | None = None,
     arb_config: ArbitrageConfig | None = None,
+    *,
+    mode: str = "transfer",
 ) -> list[dict[str, str | float]]:
     """
     Single-pass O(n) scan: group tickers by canonical identity + quote,
@@ -160,6 +163,8 @@ def _compute_arbitrage(
                 entry["min_ask_vol"] = t.volume_quote
                 entry["min_ask_ts"] = ts
 
+    is_hedge = mode == "hedge"
+
     results: list[dict[str, str | float]] = []
     for entry in best.values():
         if not entry["multi"]:
@@ -168,8 +173,8 @@ def _compute_arbitrage(
             continue
         if entry["max_bid"] <= entry["min_ask"]:
             continue
-        # Filter non-executable arbs (transfers blocked)
-        if fees and not fees.can_execute_arb(
+        # Transfer mode: filter non-executable arbs (transfers blocked)
+        if not is_hedge and fees and not fees.can_execute_arb(
             bid_exchange=entry["max_bid_ex"],
             ask_exchange=entry["min_ask_ex"],
             symbol=entry["base"],
@@ -182,8 +187,7 @@ def _compute_arbitrage(
         if min_profit > 0 and profit < min_profit:
             continue
 
-        # Net profit after taker fees + withdrawal cost in quote
-        # Withdrawal is from ask_exchange (where we buy)
+        # Net profit after taker fees
         if fees:
             net_pf = fees.net_profit_after_taker(
                 bid=bid,
@@ -191,21 +195,27 @@ def _compute_arbitrage(
                 bid_exchange=entry["max_bid_ex"],
                 ask_exchange=entry["min_ask_ex"],
             )
-            wf = round(fees.withdrawal_cost_quote(
+            # Rebal cost: withdrawal fee from ask exchange (informational)
+            rc = round(fees.withdrawal_cost_quote(
                 entry["base"], bid, exchange=entry["min_ask_ex"],
             ), 8)
         else:
             net_pf = profit
-            wf = 0.0
+            rc = 0.0
 
-        # True net profit: accounts for withdrawal fee relative to trade size
-        ref_size = arb_config.ref_trade_size if arb_config else 1000.0
-        tnpf = net_pf - (wf / ref_size) * 100 if ref_size > 0 and wf > 0 else net_pf
+        if is_hedge:
+            wf = 0.0
+            tnpf = net_pf
+        else:
+            wf = rc
+            ref_size = arb_config.ref_trade_size if arb_config else 1000.0
+            tnpf = net_pf - (wf / ref_size) * 100 if ref_size > 0 and wf > 0 else net_pf
 
         now_ms = int(time.time() * 1000)
         bts = entry["max_bid_ts"]
         ats = entry["min_ask_ts"]
         age = max(now_ms - bts, now_ms - ats)
+        msv = min(entry["max_bid_vol"], entry["min_ask_vol"])
 
         results.append({
             "s": entry["symbol"],
@@ -219,6 +229,8 @@ def _compute_arbitrage(
             "npf": round(net_pf, 4),
             "tnpf": round(tnpf, 4),
             "wf": wf,
+            "rc": rc,
+            "msv": msv,
             "bv": entry["max_bid_vol"],
             "av": entry["min_ask_vol"],
             "bts": bts,
@@ -315,6 +327,10 @@ async def _ws_handler(request: web.Request) -> web.WebSocketResponse:
                             state.arb_exchanges = []
                     if "arb_quote" in data:
                         state.arb_quote = str(data["arb_quote"])
+                    if "arb_mode" in data:
+                        m = str(data["arb_mode"])
+                        if m in ("transfer", "hedge"):
+                            state.arb_mode = m
 
                 except (json.JSONDecodeError, TypeError):
                     pass
@@ -341,11 +357,17 @@ async def _broadcast_loop(app: web.Application) -> None:
 
             # Split clients by view
             ticker_groups: dict[tuple[str, str], list[ClientState]] = {}
-            arb_groups: dict[tuple[frozenset[str], str], list[ClientState]] = {}
+            arb_groups: dict[
+                tuple[str, frozenset[str], str], list[ClientState]
+            ] = {}
 
             for state in list(clients.values()):
                 if state.view == "arbitrage":
-                    key = (frozenset(state.arb_exchanges), state.arb_quote)
+                    key = (
+                        state.arb_mode,
+                        frozenset(state.arb_exchanges),
+                        state.arb_quote,
+                    )
                     arb_groups.setdefault(key, []).append(state)
                 else:
                     key = (state.exchange, state.quote)
@@ -374,14 +396,19 @@ async def _broadcast_loop(app: web.Application) -> None:
                     except (ConnectionError, OSError):
                         dead.append(id(state.ws))
 
-            # --- Arbitrage broadcasts (compute once, filter per group) ---
+            # --- Arbitrage broadcasts (compute once per mode, filter per group) ---
             if arb_groups:
-                arb_all = _compute_arbitrage(
-                    all_tickers, registry, fees, arb_config,
-                )
+                arb_by_mode: dict[str, list[dict[str, str | float]]] = {}
 
-                for (arb_exs, arb_q), group_clients in arb_groups.items():
-                    filtered = _filter_arbitrage(arb_all, list(arb_exs), arb_q)
+                for (arb_mode, arb_exs, arb_q), group_clients in arb_groups.items():
+                    if arb_mode not in arb_by_mode:
+                        arb_by_mode[arb_mode] = _compute_arbitrage(
+                            all_tickers, registry, fees, arb_config,
+                            mode=arb_mode,
+                        )
+                    filtered = _filter_arbitrage(
+                        arb_by_mode[arb_mode], list(arb_exs), arb_q,
+                    )
                     payload = json.dumps(
                         {
                             "view": "arbitrage",
@@ -390,6 +417,7 @@ async def _broadcast_loop(app: web.Application) -> None:
                             "active": {
                                 "arb_exchanges": sorted(arb_exs),
                                 "arb_quote": arb_q,
+                                "arb_mode": arb_mode,
                             },
                             "server_ts": server_ts,
                         },

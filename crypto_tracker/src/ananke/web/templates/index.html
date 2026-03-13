@@ -217,6 +217,14 @@
   .flash-down { animation: flash-red 0.6s ease-out; }
 
   #arbTable { min-width: 1200px; }
+  #arbTable.hedge .hedge-hide,
+  #arbTable.hedge .hedge-hide { display: none; }
+  #arbTable:not(.hedge) .hedge-only { display: none; }
+
+  .mode-btn.active {
+    background: #1a1a00; border-color: var(--orange);
+    color: var(--orange); text-shadow: 0 0 5px rgba(255,145,0,0.2);
+  }
 
   tr.stale-row { opacity: 0.4; }
   tr.arb-stale { border: 1px solid var(--red) !important; }
@@ -266,6 +274,11 @@
     <span class="ctrl-label arb-filter" style="display:none;">MIN PROFIT %</span>
     <input type="number" class="num-input arb-filter" id="arbMinProfit" value="0" min="0" step="0.1" style="display:none; width:55px;">
 
+    <span class="sep arb-filter" style="display:none;">|</span>
+    <span class="ctrl-label arb-filter" style="display:none;">MODE:</span>
+    <button class="filter-btn mode-btn arb-filter active" data-mode="transfer" style="display:none;">TRANSFER</button>
+    <button class="filter-btn mode-btn arb-filter" data-mode="hedge" style="display:none;">HEDGE</button>
+
     <div class="stats">
       <div id="statsLabel">PAIRS:</div>
       <div><span id="pairCount">0</span></div>
@@ -312,14 +325,16 @@
         <th data-key="s" data-table="arb">PAR</th>
         <th data-key="pf" data-table="arb">PROFIT %<span class="sort-arrow">&darr;</span></th>
         <th data-key="npf" data-table="arb">NET PROFIT %<span class="sort-arrow">&darr;</span></th>
-        <th data-key="tnpf" data-table="arb" class="sorted">TRUE NET %<span class="sort-arrow">&darr;</span></th>
-        <th data-key="wf" data-table="arb">TAXA ENVIO<span class="sort-arrow">&darr;</span></th>
+        <th data-key="tnpf" data-table="arb" class="sorted hedge-hide">TRUE NET %<span class="sort-arrow">&darr;</span></th>
+        <th data-key="wf" data-table="arb" class="hedge-hide">TAXA ENVIO<span class="sort-arrow">&darr;</span></th>
         <th data-key="ak" data-table="arb">COMPRA (ASK)<span class="sort-arrow">&darr;</span></th>
         <th data-key="ax" data-table="arb">EXCHANGE COMPRA<span class="sort-arrow">&darr;</span></th>
         <th data-key="bi" data-table="arb">VENDA (BID)<span class="sort-arrow">&darr;</span></th>
         <th data-key="bx" data-table="arb">EXCHANGE VENDA<span class="sort-arrow">&darr;</span></th>
         <th data-key="av" data-table="arb">VOL COMPRA<span class="sort-arrow">&darr;</span></th>
         <th data-key="bv" data-table="arb">VOL VENDA<span class="sort-arrow">&darr;</span></th>
+        <th data-key="msv" data-table="arb">MIN VOL<span class="sort-arrow">&darr;</span></th>
+        <th data-key="rc" data-table="arb" class="hedge-only">REBAL COST<span class="sort-arrow">&darr;</span></th>
         <th data-key="age" data-table="arb">AGE<span class="sort-arrow">&darr;</span></th>
       </tr>
     </thead>
@@ -355,6 +370,7 @@
   let arbQuoteFilter = 'ALL';
   let arbMinVol = 10000;
   let arbMinProfit = 0;
+  let arbMode = 'transfer';
 
   // Shared
   let searchTerm = '';
@@ -448,7 +464,7 @@
     if (currentView === 'tickers') {
       ws.send(JSON.stringify({view:'tickers', exchange:exchangeFilter, quote:quoteFilter}));
     } else {
-      ws.send(JSON.stringify({view:'arbitrage', arb_exchanges:arbExchangeFilter, arb_quote:arbQuoteFilter}));
+      ws.send(JSON.stringify({view:'arbitrage', arb_exchanges:arbExchangeFilter, arb_quote:arbQuoteFilter, arb_mode:arbMode}));
     }
   }
 
@@ -588,6 +604,13 @@
         if (msg.active) {
           arbExchangeFilter = msg.active.arb_exchanges || [];
           arbQuoteFilter = msg.active.arb_quote;
+          if (msg.active.arb_mode) {
+            arbMode = msg.active.arb_mode;
+            $arbTable.classList.toggle('hedge', arbMode === 'hedge');
+            document.querySelectorAll('.mode-btn').forEach(b => {
+              b.classList.toggle('active', b.dataset.mode === arbMode);
+            });
+          }
           syncQuoteBtns();
           rebuildExBtns();
         }
@@ -732,20 +755,24 @@
       const staleRowClass = isStale ? ' arb-stale' : '';
       const staleLbl = isStale ? '<span class="stale-label">STALE</span>' : '';
 
+      const rcStr = o.rc > 0 ? '~'+fP(o.rc) : '\u2014';
+
       buf[i] =
         '<tr class="'+fc+staleRowClass+'">'+
         '<td>'+gi+'</td>'+
         '<td class="pair-cell"><span class="pair-base">'+o.b+'</span><span class="pair-quote">/'+o.q+'</span></td>'+
         '<td class="'+pfClass+'">'+o.pf.toFixed(3)+'%</td>'+
         '<td class="'+npfClass+'">'+o.npf.toFixed(3)+'%</td>'+
-        '<td class="'+tnpfClass+'">'+o.tnpf.toFixed(3)+'%</td>'+
-        '<td>'+wfStr+'</td>'+
+        '<td class="hedge-hide '+tnpfClass+'">'+o.tnpf.toFixed(3)+'%</td>'+
+        '<td class="hedge-hide">'+wfStr+'</td>'+
         '<td>'+fP(o.ak)+'</td>'+
         '<td class="ex-tag">'+exLink(o.ax,o.b,o.q)+'</td>'+
         '<td>'+fP(o.bi)+'</td>'+
         '<td class="ex-tag">'+exLink(o.bx,o.b,o.q)+'</td>'+
         '<td>'+fV(o.av)+'</td>'+
         '<td>'+fV(o.bv)+'</td>'+
+        '<td>'+fV(o.msv)+'</td>'+
+        '<td class="hedge-only">'+rcStr+'</td>'+
         '<td class="'+arbAgeClass+'">'+fAge(arbAge)+staleLbl+'</td>'+
         '</tr>';
     }
@@ -798,6 +825,28 @@
     arbMinProfit = parseFloat($arbMinProfit.value) || 0;
     page = 0;
     renderArb();
+  });
+
+  // --- Mode Toggle ---
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      arbMode = btn.dataset.mode;
+      $arbTable.classList.toggle('hedge', arbMode === 'hedge');
+      // Switch default sort: hedge → npf, transfer → tnpf
+      if (arbMode === 'hedge' && arbSortKey === 'tnpf') {
+        arbSortKey = 'npf';
+      } else if (arbMode === 'transfer' && arbSortKey === 'npf') {
+        arbSortKey = 'tnpf';
+      }
+      // Update sorted header visual
+      $arbTable.querySelectorAll('th').forEach(h => h.classList.remove('sorted'));
+      const activeHeader = $arbTable.querySelector('th[data-key="'+arbSortKey+'"]');
+      if (activeHeader) activeHeader.classList.add('sorted');
+      page = 0;
+      sendFilters();
+    });
   });
 
   // --- Column Sort ---

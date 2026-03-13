@@ -2410,3 +2410,52 @@ KeyboardInterrupt
 2026-03-12 21:28:37,432 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
 2026-03-12 21:28:42,104 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
 2026-03-12 21:28:46,737 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:28:51,332 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:28:55,917 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:01,653 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:06,134 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:10,760 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:16,315 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:20,949 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:25,477 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:30,034 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:34,691 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:38,740 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:43,666 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:48,656 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:29:53,246 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 21:36:55,741 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f7556701710>
+2026-03-12 21:36:55,741 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f7557067350>
+2026-03-12 21:36:55,742 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f7556702e90>
+2026-03-12 21:36:55,742 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f7556703a50>
+2026-03-12 21:36:55,742 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f755671c5d0>
+2026-03-12 21:36:55,742 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f755671d290>
+2026-03-12 21:36:55,742 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-26' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-12 21:36:55,742 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-27' coro=<BybitExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/bybit.py:109> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-12 21:36:55,742 [asyncio] ERROR: Task exception was never retrieved
+future: <Task finished name='Task-31' coro=<KrakenExchange._ws_listen() done, defined at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py:149> exception=InvalidStatus(Response(status_code=429, reason_phrase='Too Many Requests', headers=Headers([('Date', 'Fri, 13 Mar 2026 00:29:56 GMT'), ('Content-Type', 'text/plain; charset=UTF-8'), ('Content-Length', '16'), ('Connection', 'keep-alive'), ('Retry-After', '600'), ('X-Frame-Options', 'SAMEORIGIN'), ('Referrer-Policy', 'same-origin'), ('Cache-Control', 'private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0'), ('Expires', 'Thu, 01 Jan 1970 00:00:01 GMT'), ('Set-Cookie', '__cf_bm=OEvWvaw4saYCMDqz7U8tD4m3Qhqy1fu5HDMnTaY13Ho-1773361796-1.0.1.1-6HNla_izmBDeNJh.aiSXFHqWxCYxPk31iUHs6T.W8QF4WwIlvuh9lrbNpwrtAUDmBvclY9L0n1jXU1zpGQfBmQEZeiBFRiM8X.74kff1UrQ; path=/; expires=Fri, 13-Mar-26 00:59:56 GMT; domain=.kraken.com; HttpOnly; Secure; SameSite=None'), ('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload'), ('X-Content-Type-Options', 'nosniff'), ('Set-Cookie', '_cfuvid=DdC2xq5oAxr9XFm2i99tutOLwNoyyR1qWFvI7QlIwGQ-1773361796504-0.0.1.1-604800000; path=/; domain=.kraken.com; HttpOnly; Secure; SameSite=None'), ('Server', 'cloudflare'), ('CF-RAY', '9db6ed5b8ccde115-GIG')]), body=bytearray(b'error code: 1015'), _exception=InvalidStatus(...)))>
+Traceback (most recent call last):
+  File "/dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py", line 153, in _ws_listen
+    async with websockets.connect(
+  File "/home/caio/.local/lib/python3.11/site-packages/websockets/asyncio/client.py", line 590, in __aenter__
+    return await self
+           ^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/websockets/asyncio/client.py", line 546, in __await_impl__
+    await self.connection.handshake(
+  File "/home/caio/.local/lib/python3.11/site-packages/websockets/asyncio/client.py", line 115, in handshake
+    raise self.protocol.handshake_exc
+  File "/home/caio/.local/lib/python3.11/site-packages/websockets/client.py", line 327, in parse
+    self.process_response(response)
+  File "/home/caio/.local/lib/python3.11/site-packages/websockets/client.py", line 144, in process_response
+    raise InvalidStatus(response)
+websockets.exceptions.InvalidStatus: server rejected WebSocket connection: HTTP 429
+2026-03-12 21:36:55,746 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-35' coro=<GateioExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/gateio.py:103> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>

@@ -833,3 +833,106 @@ def test_arb_wf_uses_ask_exchange_fee() -> None:
     assert len(result) == 1
     # Ask exchange is Kraken → 0.0001 BTC * 60100 bid = 6.01
     assert result[0]["wf"] == round(0.0001 * 60100.0, 8)
+
+
+# --- Hedge mode tests ---
+
+
+def test_hedge_mode_no_withdrawal_fee() -> None:
+    """Hedge mode: wf is always 0, tnpf equals npf."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=60100.0, ask=60200.0, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=59800.0, ask=60000.0, volume_quote=50_000),
+    ]
+    fees = _fee_registry()
+    result = _compute_arbitrage(tickers, fees=fees, mode="hedge")
+    assert len(result) == 1
+    opp = result[0]
+    assert opp["wf"] == 0.0
+    assert opp["tnpf"] == opp["npf"]
+
+
+def test_hedge_mode_has_rebal_cost() -> None:
+    """Hedge mode: rc (rebal cost) shows withdrawal fee for informational use."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=60100.0, ask=60200.0, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=59800.0, ask=60000.0, volume_quote=50_000),
+    ]
+    fees = _fee_registry()
+    result = _compute_arbitrage(tickers, fees=fees, mode="hedge")
+    assert len(result) == 1
+    opp = result[0]
+    # rc = BTC withdrawal fee (0.0005) * bid price (60100)
+    assert opp["rc"] == round(0.0005 * 60100.0, 8)
+    assert opp["rc"] > 0
+
+
+def test_hedge_mode_skips_can_execute_arb() -> None:
+    """Hedge mode: transfer blocks are ignored (trader doesn't transfer)."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0, volume_quote=50_000),
+    ]
+    fees = _fee_registry_with_blocks(
+        withdraw_blocked=frozenset({("KuCoin", "BTC")}),
+    )
+    # Transfer mode: blocked
+    result_transfer = _compute_arbitrage(tickers, fees=fees, mode="transfer")
+    assert len(result_transfer) == 0
+    # Hedge mode: passes through
+    result_hedge = _compute_arbitrage(tickers, fees=fees, mode="hedge")
+    assert len(result_hedge) == 1
+
+
+def test_hedge_mode_npf_same_as_transfer() -> None:
+    """Hedge and transfer modes compute the same npf (taker-fee-only profit)."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=50_000),
+    ]
+    fees = _fee_registry()
+    r_hedge = _compute_arbitrage(tickers, fees=fees, mode="hedge")
+    r_transfer = _compute_arbitrage(tickers, fees=fees, mode="transfer")
+    assert len(r_hedge) == 1
+    assert len(r_transfer) == 1
+    assert r_hedge[0]["npf"] == r_transfer[0]["npf"]
+
+
+def test_hedge_mode_has_min_side_volume() -> None:
+    """Both modes include msv (min side volume) field."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=20_000),
+    ]
+    r_hedge = _compute_arbitrage(tickers, mode="hedge")
+    assert len(r_hedge) == 1
+    assert r_hedge[0]["msv"] == 20_000
+
+    r_transfer = _compute_arbitrage(tickers, mode="transfer")
+    assert len(r_transfer) == 1
+    assert r_transfer[0]["msv"] == 20_000
+
+
+def test_transfer_mode_rc_equals_wf() -> None:
+    """In transfer mode, rc equals wf (same withdrawal cost)."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=60100.0, ask=60200.0, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=59800.0, ask=60000.0, volume_quote=50_000),
+    ]
+    fees = _fee_registry()
+    result = _compute_arbitrage(tickers, fees=fees, mode="transfer")
+    assert len(result) == 1
+    assert result[0]["rc"] == result[0]["wf"]
+
+
+def test_hedge_mode_no_fees_rc_zero() -> None:
+    """Hedge without fee registry: rc is 0."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0),
+    ]
+    result = _compute_arbitrage(tickers, mode="hedge")
+    assert len(result) == 1
+    assert result[0]["rc"] == 0.0
+    assert result[0]["wf"] == 0.0
+    assert result[0]["tnpf"] == result[0]["npf"]
