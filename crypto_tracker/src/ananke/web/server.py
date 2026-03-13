@@ -17,8 +17,9 @@ from pathlib import Path
 from aiohttp import web
 from aiohttp.web_ws import WebSocketResponse
 
+from ananke.alerts import AlertEngine
 from ananke.coin_registry import CoinRegistry, build_registry
-from ananke.config import ArbitrageConfig, WebConfig
+from ananke.config import AlertConfig, ArbitrageConfig, WebConfig
 from ananke.exchanges.manager import ExchangeManager
 from ananke.fee_registry import FeeRegistry, build_fee_registry
 from ananke.models import Ticker
@@ -358,6 +359,7 @@ async def _broadcast_loop(app: web.Application) -> None:
     fees: FeeRegistry = app["fee_registry"]
     arb_config: ArbitrageConfig = app["arb_config"]
     depth_probe: OrderBookProbe | None = app.get("depth_probe")
+    alert_engine: AlertEngine | None = app.get("alert_engine")
 
     while True:
         if clients and manager.has_data():
@@ -455,6 +457,20 @@ async def _broadcast_loop(app: web.Application) -> None:
                         except (ConnectionError, OSError):
                             dead.append(id(state.ws))
 
+            # --- Alert check (fire-and-forget) ---
+            if alert_engine and alert_engine.enabled:
+                alert_mode = alert_engine._alert_mode
+                if not arb_groups:
+                    arb_by_mode = {}
+                if alert_mode not in arb_by_mode:
+                    arb_by_mode[alert_mode] = _compute_arbitrage(
+                        all_tickers, registry, fees, arb_config,
+                        mode=alert_mode,
+                    )
+                asyncio.create_task(
+                    alert_engine.check_and_alert(arb_by_mode[alert_mode]),
+                )
+
             # --- Triangular broadcasts ---
             if tri_groups:
                 taker_fees = {
@@ -503,21 +519,39 @@ async def _on_cleanup(app: web.Application) -> None:
     probe: OrderBookProbe | None = app.get("depth_probe")
     if probe:
         await probe.close()
+    alert: AlertEngine | None = app.get("alert_engine")
+    if alert:
+        await alert.close()
 
 
 async def start_web(
     manager: ExchangeManager,
     config: WebConfig | None = None,
     arb_config: ArbitrageConfig | None = None,
+    alert_config: AlertConfig | None = None,
 ) -> web.AppRunner:
     """Create and start the aiohttp web server."""
     config = config or WebConfig()
     arb_config = arb_config or ArbitrageConfig()
+    alert_config = alert_config or AlertConfig()
 
     registry = await build_registry()
     fees = await build_fee_registry()
 
     depth_probe = OrderBookProbe() if arb_config.depth_enabled else None
+
+    # Alert engine — zero overhead if token/chat_id not set
+    alert_engine: AlertEngine | None = None
+    if alert_config.enabled and alert_config.telegram_token and alert_config.telegram_chat_id:
+        alert_engine = AlertEngine(
+            token=alert_config.telegram_token,
+            chat_id=alert_config.telegram_chat_id,
+            min_profit_pct=alert_config.min_profit_pct,
+            min_volume_quote=alert_config.min_volume_quote,
+            cooldown_minutes=alert_config.cooldown_minutes,
+            alert_mode=alert_config.alert_mode,
+        )
+        logger.info("Telegram alerts enabled (cooldown=%dm)", alert_config.cooldown_minutes)
 
     app = web.Application()
     app["manager"] = manager
@@ -527,6 +561,7 @@ async def start_web(
     app["coin_registry"] = registry
     app["fee_registry"] = fees
     app["depth_probe"] = depth_probe
+    app["alert_engine"] = alert_engine
     app.on_startup.append(_on_startup)
     app.on_cleanup.append(_on_cleanup)
 

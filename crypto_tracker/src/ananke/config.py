@@ -104,6 +104,19 @@ class ArbitrageConfig:
 
 
 @dataclass(frozen=True)
+class AlertConfig:
+    """Telegram alert settings for arbitrage opportunities."""
+
+    enabled: bool = False
+    telegram_token: str = ""
+    telegram_chat_id: str = ""
+    min_profit_pct: float = 0.5
+    min_volume_quote: float = 50_000.0
+    cooldown_minutes: float = 5.0
+    alert_mode: str = "transfer"  # "transfer" or "hedge"
+
+
+@dataclass(frozen=True)
 class WebConfig:
     """Web server settings."""
 
@@ -133,6 +146,7 @@ class AppConfig:
     gateio: GateioConfig = field(default_factory=GateioConfig)
     enabled_exchanges: tuple[str, ...] = ("binance", "bybit", "okx", "kraken", "kucoin", "gateio")
     arbitrage: ArbitrageConfig = field(default_factory=ArbitrageConfig)
+    alert: AlertConfig = field(default_factory=AlertConfig)
     web: WebConfig = field(default_factory=WebConfig)
     display: DisplayConfig = field(default_factory=DisplayConfig)
     log_level: str = "WARNING"
@@ -239,6 +253,22 @@ def load_config() -> AppConfig:
             depth_top_n=_env_int(
                 "ANANKE_ARB_DEPTH_TOP_N", ArbitrageConfig.depth_top_n,
             ),
+        ),
+        alert=AlertConfig(
+            enabled=_env("ANANKE_ALERT_ENABLED", "false").lower()
+            not in ("false", "0", "no", ""),
+            telegram_token=_env("ANANKE_TELEGRAM_TOKEN", ""),
+            telegram_chat_id=_env("ANANKE_TELEGRAM_CHAT_ID", ""),
+            min_profit_pct=_env_float(
+                "ANANKE_ALERT_MIN_PROFIT", AlertConfig.min_profit_pct,
+            ),
+            min_volume_quote=_env_float(
+                "ANANKE_ALERT_MIN_VOLUME", AlertConfig.min_volume_quote,
+            ),
+            cooldown_minutes=_env_float(
+                "ANANKE_ALERT_COOLDOWN_MIN", AlertConfig.cooldown_minutes,
+            ),
+            alert_mode=_env("ANANKE_ALERT_MODE", AlertConfig.alert_mode),
         ),
         web=WebConfig(
             host=_env("ANANKE_WEB_HOST", web_d.host),
