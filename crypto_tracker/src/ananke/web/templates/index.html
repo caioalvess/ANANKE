@@ -217,6 +217,13 @@
   .flash-down { animation: flash-red 0.6s ease-out; }
 
   #arbTable { min-width: 1200px; }
+
+  tr.stale-row { opacity: 0.4; }
+  tr.arb-stale { border: 1px solid var(--red) !important; }
+  .age-fresh { color: var(--green); }
+  .age-warn { color: var(--yellow); }
+  .age-old { color: var(--red); }
+  .stale-label { color: var(--red); font-size: 9px; font-weight: 700; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -313,6 +320,7 @@
         <th data-key="bx" data-table="arb">EXCHANGE VENDA<span class="sort-arrow">&darr;</span></th>
         <th data-key="av" data-table="arb">VOL COMPRA<span class="sort-arrow">&darr;</span></th>
         <th data-key="bv" data-table="arb">VOL VENDA<span class="sort-arrow">&darr;</span></th>
+        <th data-key="age" data-table="arb">AGE<span class="sort-arrow">&darr;</span></th>
       </tr>
     </thead>
     <tbody id="arbTbody"></tbody>
@@ -359,6 +367,7 @@
   let ws = null;
   let reconnectDelay = 1000;
   let tabsRendered = false;
+  let serverTs = 0;
 
   const $ = id => document.getElementById(id);
   const $tbody = $('tbody');
@@ -414,6 +423,15 @@
   }
   function fI(v) { return v ? v.toLocaleString('en-US') : '\u2014'; }
   function cc(v) { return v>0?'pos':v<0?'neg':'dim'; }
+  function fAge(ms) {
+    if (ms < 1000) return '<1s';
+    return Math.floor(ms/1000)+'s';
+  }
+  function ageClass(ms) {
+    if (ms < 3000) return 'age-fresh';
+    if (ms <= 10000) return 'age-warn';
+    return 'age-old';
+  }
 
   // --- Clock ---
   setInterval(() => {
@@ -558,6 +576,7 @@
       try { msg = JSON.parse(e.data); } catch(err) { return; }
 
       renderTabs(msg.exchanges);
+      if (msg.server_ts) serverTs = msg.server_ts;
 
       if ($loading.style.display !== 'none') {
         $loading.style.display = 'none';
@@ -630,8 +649,11 @@
       newPrev[key] = t.p;
       const gi = start + i + 1;
 
+      const tickAge = serverTs && t.ts ? serverTs - t.ts : 0;
+      const staleClass = tickAge > 10000 ? ' stale-row' : '';
+
       buf[i] =
-        '<tr class="'+fc+'">'+
+        '<tr class="'+fc+staleClass+'">'+
         '<td>'+gi+'</td>'+
         '<td class="pair-cell"><span class="pair-base">'+t.b+'</span><span class="pair-quote">/'+t.q+'</span></td>'+
         '<td>'+fP(t.p)+'</td>'+
@@ -703,8 +725,15 @@
       const tnpfClass = o.tnpf > 0 ? (o.tnpf >= 0.5 ? 'ylw' : 'pos') : o.tnpf < 0 ? 'neg' : 'dim';
       const wfStr = o.wf > 0 ? '~'+fP(o.wf) : '\u2014';
 
+      // Age: use server_ts to recalculate (age field was computed at broadcast time)
+      const arbAge = serverTs ? Math.max(serverTs - (o.bts||0), serverTs - (o.ats||0)) : (o.age||0);
+      const arbAgeClass = ageClass(arbAge);
+      const isStale = arbAge > 30000;
+      const staleRowClass = isStale ? ' arb-stale' : '';
+      const staleLbl = isStale ? '<span class="stale-label">STALE</span>' : '';
+
       buf[i] =
-        '<tr class="'+fc+'">'+
+        '<tr class="'+fc+staleRowClass+'">'+
         '<td>'+gi+'</td>'+
         '<td class="pair-cell"><span class="pair-base">'+o.b+'</span><span class="pair-quote">/'+o.q+'</span></td>'+
         '<td class="'+pfClass+'">'+o.pf.toFixed(3)+'%</td>'+
@@ -717,6 +746,7 @@
         '<td class="ex-tag">'+exLink(o.bx,o.b,o.q)+'</td>'+
         '<td>'+fV(o.av)+'</td>'+
         '<td>'+fV(o.bv)+'</td>'+
+        '<td class="'+arbAgeClass+'">'+fAge(arbAge)+staleLbl+'</td>'+
         '</tr>';
     }
     $arbTbody.innerHTML = buf.join('');

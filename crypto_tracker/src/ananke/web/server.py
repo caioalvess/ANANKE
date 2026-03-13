@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -60,6 +61,7 @@ def _serialize_ticker(t: Ticker) -> dict[str, str | int | float]:
         "am": round(t.amplitude, 2),
         "tc": t.trades_count,
         "ex": t.exchange,
+        "ts": int(t.last_update.timestamp() * 1000),
     }
 
 
@@ -125,6 +127,8 @@ def _compute_arbitrage(
             # Graceful degradation — no registry available
             key = (t.base_asset, t.quote_asset)
 
+        ts = int(t.last_update.timestamp() * 1000)
+
         entry = best.get(key)
         if entry is None:
             best[key] = {
@@ -134,9 +138,11 @@ def _compute_arbitrage(
                 "max_bid": t.bid,
                 "max_bid_ex": t.exchange,
                 "max_bid_vol": t.volume_quote,
+                "max_bid_ts": ts,
                 "min_ask": t.ask,
                 "min_ask_ex": t.exchange,
                 "min_ask_vol": t.volume_quote,
+                "min_ask_ts": ts,
                 "first_ex": t.exchange,
                 "multi": False,
             }
@@ -147,10 +153,12 @@ def _compute_arbitrage(
                 entry["max_bid"] = t.bid
                 entry["max_bid_ex"] = t.exchange
                 entry["max_bid_vol"] = t.volume_quote
+                entry["max_bid_ts"] = ts
             if t.ask < entry["min_ask"]:
                 entry["min_ask"] = t.ask
                 entry["min_ask_ex"] = t.exchange
                 entry["min_ask_vol"] = t.volume_quote
+                entry["min_ask_ts"] = ts
 
     results: list[dict[str, str | float]] = []
     for entry in best.values():
@@ -194,6 +202,11 @@ def _compute_arbitrage(
         ref_size = arb_config.ref_trade_size if arb_config else 1000.0
         tnpf = net_pf - (wf / ref_size) * 100 if ref_size > 0 and wf > 0 else net_pf
 
+        now_ms = int(time.time() * 1000)
+        bts = entry["max_bid_ts"]
+        ats = entry["min_ask_ts"]
+        age = max(now_ms - bts, now_ms - ats)
+
         results.append({
             "s": entry["symbol"],
             "b": entry["base"],
@@ -208,6 +221,9 @@ def _compute_arbitrage(
             "wf": wf,
             "bv": entry["max_bid_vol"],
             "av": entry["min_ask_vol"],
+            "bts": bts,
+            "ats": ats,
+            "age": age,
         })
 
     return results
@@ -337,6 +353,8 @@ async def _broadcast_loop(app: web.Application) -> None:
 
             dead: list[int] = []
 
+            server_ts = int(time.time() * 1000)
+
             # --- Ticker broadcasts ---
             for (exchange, quote), group_clients in ticker_groups.items():
                 filtered = _filter_tickers(all_tickers, exchange, quote)
@@ -346,6 +364,7 @@ async def _broadcast_loop(app: web.Application) -> None:
                         "tickers": filtered,
                         "exchanges": exchanges,
                         "active": {"exchange": exchange, "quote": quote},
+                        "server_ts": server_ts,
                     },
                     separators=(",", ":"),
                 )
@@ -372,6 +391,7 @@ async def _broadcast_loop(app: web.Application) -> None:
                                 "arb_exchanges": sorted(arb_exs),
                                 "arb_quote": arb_q,
                             },
+                            "server_ts": server_ts,
                         },
                         separators=(",", ":"),
                     )
