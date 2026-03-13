@@ -304,7 +304,8 @@
         <th data-key="idx" data-table="arb" style="width:40px;">#</th>
         <th data-key="s" data-table="arb">PAR</th>
         <th data-key="pf" data-table="arb">PROFIT %<span class="sort-arrow">&darr;</span></th>
-        <th data-key="npf" data-table="arb" class="sorted">NET PROFIT %<span class="sort-arrow">&darr;</span></th>
+        <th data-key="npf" data-table="arb">NET PROFIT %<span class="sort-arrow">&darr;</span></th>
+        <th data-key="tnpf" data-table="arb" class="sorted">TRUE NET %<span class="sort-arrow">&darr;</span></th>
         <th data-key="wf" data-table="arb">TAXA ENVIO<span class="sort-arrow">&darr;</span></th>
         <th data-key="ak" data-table="arb">COMPRA (ASK)<span class="sort-arrow">&darr;</span></th>
         <th data-key="ax" data-table="arb">EXCHANGE COMPRA<span class="sort-arrow">&darr;</span></th>
@@ -350,7 +351,7 @@
   // Shared
   let searchTerm = '';
   let sortKey = 'vq';
-  let arbSortKey = 'npf';
+  let arbSortKey = 'tnpf';
   let sortAsc = false;
   let arbSortAsc = false;
   let page = 0;
@@ -694,11 +695,12 @@
       const key = o.s+'_'+o.bx+'_'+o.ax;
       const prev = prevArbProfits[key];
       let fc = '';
-      if (prev !== undefined && prev !== o.npf) fc = o.npf>prev?'flash-up':'flash-down';
-      newPrevArb[key] = o.npf;
+      if (prev !== undefined && prev !== o.tnpf) fc = o.tnpf>prev?'flash-up':'flash-down';
+      newPrevArb[key] = o.tnpf;
       const gi = start + i + 1;
       const pfClass = o.pf >= 0.5 ? 'ylw' : o.pf >= 0.1 ? 'pos' : 'dim';
       const npfClass = o.npf > 0 ? (o.npf >= 0.5 ? 'ylw' : 'pos') : o.npf < 0 ? 'neg' : 'dim';
+      const tnpfClass = o.tnpf > 0 ? (o.tnpf >= 0.5 ? 'ylw' : 'pos') : o.tnpf < 0 ? 'neg' : 'dim';
       const wfStr = o.wf > 0 ? '~'+fP(o.wf) : '\u2014';
 
       buf[i] =
@@ -707,6 +709,7 @@
         '<td class="pair-cell"><span class="pair-base">'+o.b+'</span><span class="pair-quote">/'+o.q+'</span></td>'+
         '<td class="'+pfClass+'">'+o.pf.toFixed(3)+'%</td>'+
         '<td class="'+npfClass+'">'+o.npf.toFixed(3)+'%</td>'+
+        '<td class="'+tnpfClass+'">'+o.tnpf.toFixed(3)+'%</td>'+
         '<td>'+wfStr+'</td>'+
         '<td>'+fP(o.ak)+'</td>'+
         '<td class="ex-tag">'+exLink(o.ax,o.b,o.q)+'</td>'+

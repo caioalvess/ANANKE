@@ -59,12 +59,14 @@ class FeeRegistry:
     def __init__(
         self,
         taker: dict[str, float],
-        withdrawal: dict[str, float],
+        withdrawal: dict[tuple[str, str], float],
         withdraw_blocked: frozenset[tuple[str, str]] = frozenset(),
         deposit_blocked: frozenset[tuple[str, str]] = frozenset(),
+        fallback_withdrawal: dict[str, float] | None = None,
     ) -> None:
         self._taker = taker               # exchange -> fee rate
-        self._withdrawal = withdrawal     # SYMBOL -> fee in base asset
+        self._withdrawal = withdrawal     # (exchange, SYMBOL) -> fee in base asset
+        self._fallback = fallback_withdrawal or {}  # SYMBOL -> fee (KuCoin/wfees)
         self._withdraw_blocked = withdraw_blocked  # (exchange, SYMBOL)
         self._deposit_blocked = deposit_blocked    # (exchange, SYMBOL)
 
@@ -72,9 +74,17 @@ class FeeRegistry:
         """Taker fee rate for an exchange (e.g. 0.001 for 0.1%)."""
         return self._taker.get(exchange, 0.001)
 
-    def withdrawal_fee(self, symbol: str) -> float:
-        """Withdrawal fee in base asset units (cheapest network)."""
-        return self._withdrawal.get(symbol.upper(), 0.0)
+    def withdrawal_fee(self, symbol: str, exchange: str = "") -> float:
+        """Withdrawal fee in base asset units (cheapest network).
+
+        Fallback chain: exchange-specific → KuCoin → wfees → 0.0.
+        """
+        upper = symbol.upper()
+        if exchange:
+            fee = self._withdrawal.get((exchange, upper))
+            if fee is not None:
+                return fee
+        return self._fallback.get(upper, 0.0)
 
     def net_profit_after_taker(
         self,
@@ -101,9 +111,10 @@ class FeeRegistry:
         self,
         base_symbol: str,
         price: float,
+        exchange: str = "",
     ) -> float:
         """Withdrawal fee converted to quote currency."""
-        return self.withdrawal_fee(base_symbol) * price
+        return self.withdrawal_fee(base_symbol, exchange) * price
 
     def can_execute_arb(
         self,
@@ -123,7 +134,7 @@ class FeeRegistry:
 
     @property
     def withdrawal_count(self) -> int:
-        return len(self._withdrawal)
+        return len(self._withdrawal) + len(self._fallback)
 
     @property
     def transfer_status_count(self) -> int:
@@ -156,11 +167,17 @@ def _load_cache() -> FeeRegistry | None:
             (e, s) for e, s in data.get("deposit_blocked", [])
         )
 
+        # Per-exchange withdrawal fees: [[exchange, symbol, fee], ...]
+        withdrawal: dict[tuple[str, str], float] = {}
+        for entry in data.get("withdrawal_ex", []):
+            withdrawal[(entry[0], entry[1])] = entry[2]
+
         reg = FeeRegistry(
             taker=data.get("taker", _DEFAULT_TAKER),
-            withdrawal=data.get("withdrawal", {}),
+            withdrawal=withdrawal,
             withdraw_blocked=wb,
             deposit_blocked=db,
+            fallback_withdrawal=data.get("fallback_withdrawal", {}),
         )
         logger.info(
             "Loaded fee registry from cache: %d withdrawal fees, "
@@ -181,7 +198,11 @@ def _save_cache(registry: FeeRegistry) -> None:
         _CACHE_FILE.write_text(json.dumps({
             "ts": time.time(),
             "taker": registry._taker,
-            "withdrawal": registry._withdrawal,
+            "withdrawal_ex": [
+                [ex, sym, fee]
+                for (ex, sym), fee in registry._withdrawal.items()
+            ],
+            "fallback_withdrawal": registry._fallback,
             "withdraw_blocked": [list(p) for p in registry._withdraw_blocked],
             "deposit_blocked": [list(p) for p in registry._deposit_blocked],
         }))
@@ -530,7 +551,8 @@ async def build_fee_registry() -> FeeRegistry:
     if cached is not None:
         return cached
 
-    withdrawal: dict[str, float] = {}
+    withdrawal: dict[tuple[str, str], float] = {}
+    fallback_withdrawal: dict[str, float] = {}
     all_withdraw_blocked: set[tuple[str, str]] = set()
     all_deposit_blocked: set[tuple[str, str]] = set()
 
@@ -546,7 +568,10 @@ async def build_fee_registry() -> FeeRegistry:
                 )
             )
 
-            withdrawal.update(kucoin_data.fees)
+            # KuCoin fees → per-exchange keyed
+            for sym, fee in kucoin_data.fees.items():
+                withdrawal[("KuCoin", sym)] = fee
+
             all_withdraw_blocked.update(kucoin_data.withdraw_blocked)
             all_deposit_blocked.update(kucoin_data.deposit_blocked)
             all_withdraw_blocked.update(gateio_wb)
@@ -554,12 +579,13 @@ async def build_fee_registry() -> FeeRegistry:
             all_withdraw_blocked.update(kraken_wb)
             all_deposit_blocked.update(kraken_db)
 
-            # Fallback: withdrawalfees.com for missing symbols
+            # Fallback: KuCoin fees as generic + withdrawalfees.com
+            fallback_withdrawal.update(kucoin_data.fees)
             wfees = await _fetch_wfees_fallback(session)
             fallback_count = 0
             for sym, fee in wfees.items():
-                if sym not in withdrawal:
-                    withdrawal[sym] = fee
+                if sym not in fallback_withdrawal:
+                    fallback_withdrawal[sym] = fee
                     fallback_count += 1
 
             logger.info(
@@ -578,6 +604,7 @@ async def build_fee_registry() -> FeeRegistry:
         withdrawal,
         frozenset(all_withdraw_blocked),
         frozenset(all_deposit_blocked),
+        fallback_withdrawal,
     )
     logger.info(
         "Built fee registry: %d withdrawal fees, %d withdraw-blocked, "

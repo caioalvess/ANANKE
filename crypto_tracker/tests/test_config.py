@@ -89,7 +89,14 @@ def test_arbitrage_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANANKE_ARB_MIN_VOLUME", "25000")
     monkeypatch.setenv("ANANKE_ARB_MAX_SPREAD", "3.5")
     monkeypatch.setenv("ANANKE_ARB_MIN_PROFIT", "0.5")
+    monkeypatch.setenv("ANANKE_ARB_REF_TRADE_SIZE", "5000")
     cfg = load_config()
     assert cfg.arbitrage.min_volume_quote == 25000.0
     assert cfg.arbitrage.max_pair_spread_pct == 3.5
     assert cfg.arbitrage.min_profit_pct == 0.5
+    assert cfg.arbitrage.ref_trade_size == 5000.0
+
+
+def test_arbitrage_config_ref_trade_size_default() -> None:
+    cfg = ArbitrageConfig()
+    assert cfg.ref_trade_size == 1000.0

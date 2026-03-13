@@ -1948,3 +1948,29 @@ connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3bb57
 connector: <aiohttp.connector.TCPConnector object at 0x7f3bb571d390>
 2026-03-12 20:10:50,472 [asyncio] ERROR: Task was destroyed but it is pending!
 task: <Task cancelling name='Task-26' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-12 20:28:32,782 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f316e62e250>
+2026-03-12 20:28:32,782 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f316e6804b0>, 124579.466254422)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f316e62e290>
+2026-03-12 20:28:32,783 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f316e62ebd0>
+2026-03-12 20:28:32,783 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f316e6801a0>, 124580.762458418)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f316e62ec10>
+2026-03-12 20:28:32,783 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f316e62f790>
+2026-03-12 20:28:32,783 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f316e650290>
+2026-03-12 20:28:32,783 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f316e680830>, 124579.472072975)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f316e650310>
+2026-03-12 20:28:32,783 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f316e650f10>
+2026-03-12 20:28:32,783 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f316e7fb0e0>, 124580.833406358)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f316e650f90>
+2026-03-12 20:28:32,783 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f316e62d190>
+2026-03-12 20:28:32,784 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-26' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>

@@ -19,20 +19,32 @@ class BinanceConfig:
 
 @dataclass(frozen=True)
 class BybitConfig:
-    """Bybit exchange connection settings (REST polling)."""
+    """Bybit exchange connection settings."""
 
     rest_url: str = "https://api.bybit.com"
+    ws_url: str = "wss://stream.bybit.com/v5/public/spot"
     poll_interval_sec: float = 2.0
     rest_timeout_sec: int = 15
+    ws_ping_interval: int = 20
+    ws_ping_timeout: int = 10
+    ws_close_timeout: int = 5
+    ws_reconnect_delay: int = 3
+    ws_max_failures: int = 3
 
 
 @dataclass(frozen=True)
 class OkxConfig:
-    """OKX exchange connection settings (REST polling)."""
+    """OKX exchange connection settings."""
 
     rest_url: str = "https://www.okx.com"
+    ws_url: str = "wss://ws.okx.com:8443/ws/v5/public"
     poll_interval_sec: float = 2.0
     rest_timeout_sec: int = 15
+    ws_ping_interval: int = 25
+    ws_ping_timeout: int = 10
+    ws_close_timeout: int = 5
+    ws_reconnect_delay: int = 3
+    ws_max_failures: int = 3
 
 
 @dataclass(frozen=True)
@@ -69,6 +81,7 @@ class ArbitrageConfig:
     min_volume_quote: float = 10_000.0   # min 24h volume in quote per side
     max_pair_spread_pct: float = 5.0     # max bid-ask spread % per individual pair
     min_profit_pct: float = 0.0          # min gross profit % to include (0 = all)
+    ref_trade_size: float = 1_000.0      # reference trade size in quote for tnpf calc
 
 
 @dataclass(frozen=True)
@@ -158,11 +171,13 @@ def load_config() -> AppConfig:
         ),
         bybit=BybitConfig(
             rest_url=_env("ANANKE_BYBIT_REST_URL", byb_d.rest_url),
+            ws_url=_env("ANANKE_BYBIT_WS_URL", byb_d.ws_url),
             poll_interval_sec=_env_float("ANANKE_BYBIT_POLL_INTERVAL", byb_d.poll_interval_sec),
             rest_timeout_sec=_env_int("ANANKE_BYBIT_REST_TIMEOUT", byb_d.rest_timeout_sec),
         ),
         okx=OkxConfig(
             rest_url=_env("ANANKE_OKX_REST_URL", okx_d.rest_url),
+            ws_url=_env("ANANKE_OKX_WS_URL", okx_d.ws_url),
             poll_interval_sec=_env_float("ANANKE_OKX_POLL_INTERVAL", okx_d.poll_interval_sec),
             rest_timeout_sec=_env_int("ANANKE_OKX_REST_TIMEOUT", okx_d.rest_timeout_sec),
         ),
@@ -193,6 +208,9 @@ def load_config() -> AppConfig:
             ),
             min_profit_pct=_env_float(
                 "ANANKE_ARB_MIN_PROFIT", ArbitrageConfig.min_profit_pct,
+            ),
+            ref_trade_size=_env_float(
+                "ANANKE_ARB_REF_TRADE_SIZE", ArbitrageConfig.ref_trade_size,
             ),
         ),
         web=WebConfig(

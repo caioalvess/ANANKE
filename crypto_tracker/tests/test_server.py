@@ -412,7 +412,8 @@ def _fee_registry() -> FeeRegistry:
     """Fee registry with known taker fees and a BTC withdrawal fee."""
     return FeeRegistry(
         taker={"Binance": 0.001, "Kraken": 0.004, "OKX": 0.001, "KuCoin": 0.001},
-        withdrawal={"BTC": 0.0005, "ETH": 0.005},
+        withdrawal={},
+        fallback_withdrawal={"BTC": 0.0005, "ETH": 0.005},
     )
 
 
@@ -427,6 +428,7 @@ def test_arb_npf_less_than_pf() -> None:
     opp = result[0]
     assert "npf" in opp
     assert "wf" in opp
+    assert "tnpf" in opp
     assert opp["npf"] < opp["pf"]
 
 
@@ -510,7 +512,7 @@ def test_arb_npf_negative_after_fees() -> None:
 
 
 def test_arb_no_fees_npf_equals_pf() -> None:
-    """Without fee registry, npf equals pf."""
+    """Without fee registry, npf equals pf and tnpf equals npf."""
     tickers = [
         _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
         _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0),
@@ -518,6 +520,7 @@ def test_arb_no_fees_npf_equals_pf() -> None:
     result = _compute_arbitrage(tickers)
     assert len(result) == 1
     assert result[0]["npf"] == result[0]["pf"]
+    assert result[0]["tnpf"] == result[0]["npf"]
     assert result[0]["wf"] == 0.0
 
 
@@ -530,7 +533,8 @@ def _fee_registry_with_blocks(
 ) -> FeeRegistry:
     return FeeRegistry(
         taker={"Binance": 0.001, "Kraken": 0.004, "KuCoin": 0.001, "Gate.io": 0.002},
-        withdrawal={"BTC": 0.0005},
+        withdrawal={},
+        fallback_withdrawal={"BTC": 0.0005},
         withdraw_blocked=withdraw_blocked,
         deposit_blocked=deposit_blocked,
     )
@@ -744,3 +748,88 @@ def test_arb_combined_filters() -> None:
     result = _compute_arbitrage(tickers, arb_config=cfg)
     assert len(result) == 1
     assert result[0]["b"] == "BTC"
+
+
+# --- True net profit (tnpf) tests ---
+
+
+def test_arb_tnpf_accounts_for_withdrawal_fee() -> None:
+    """tnpf = npf - (wf / ref_trade_size) * 100."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=60100.0, ask=60200.0, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=59800.0, ask=60000.0, volume_quote=50_000),
+    ]
+    fees = _fee_registry()
+    cfg = ArbitrageConfig(ref_trade_size=1000.0)
+    result = _compute_arbitrage(tickers, fees=fees, arb_config=cfg)
+    assert len(result) == 1
+    opp = result[0]
+    # wf = 0.0005 * 60100 = 30.05
+    # tnpf = npf - (30.05 / 1000) * 100 = npf - 3.005
+    expected_tnpf = round(opp["npf"] - (opp["wf"] / 1000.0) * 100, 4)
+    assert opp["tnpf"] == expected_tnpf
+    assert opp["tnpf"] < opp["npf"]
+
+
+def test_arb_tnpf_equals_npf_when_no_wf() -> None:
+    """When withdrawal fee is 0, tnpf equals npf."""
+    tickers = [
+        _make_ticker("FAKUSDT", "Binance", bid=100.0, ask=100.5, volume_quote=50_000),
+        _make_ticker("FAKUSDT", "Kraken", bid=98.0, ask=99.0, volume_quote=50_000),
+    ]
+    fees = _fee_registry()  # FAK not in fallback → wf=0
+    cfg = ArbitrageConfig(ref_trade_size=1000.0)
+    result = _compute_arbitrage(tickers, fees=fees, arb_config=cfg)
+    assert len(result) == 1
+    assert result[0]["wf"] == 0.0
+    assert result[0]["tnpf"] == result[0]["npf"]
+
+
+def test_arb_tnpf_larger_trade_size_reduces_impact() -> None:
+    """Larger ref_trade_size reduces withdrawal fee impact on tnpf."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=60100.0, ask=60200.0, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=59800.0, ask=60000.0, volume_quote=50_000),
+    ]
+    fees = _fee_registry()
+    small = ArbitrageConfig(ref_trade_size=1000.0)
+    large = ArbitrageConfig(ref_trade_size=10000.0)
+    r_small = _compute_arbitrage(tickers, fees=fees, arb_config=small)
+    r_large = _compute_arbitrage(tickers, fees=fees, arb_config=large)
+    # Larger trade → less impact → higher tnpf
+    assert r_large[0]["tnpf"] > r_small[0]["tnpf"]
+    # Both should have same npf
+    assert r_small[0]["npf"] == r_large[0]["npf"]
+
+
+# --- Per-exchange withdrawal fee tests ---
+
+
+def test_arb_per_exchange_withdrawal_fee() -> None:
+    """Exchange-specific withdrawal fee takes priority over fallback."""
+    fees = FeeRegistry(
+        taker={"Binance": 0.001, "Kraken": 0.004},
+        withdrawal={("Kraken", "BTC"): 0.0001},  # Kraken-specific
+        fallback_withdrawal={"BTC": 0.0005},      # generic fallback
+    )
+    # Withdrawal is from ask exchange (Kraken)
+    assert fees.withdrawal_fee("BTC", "Kraken") == 0.0001
+    # Binance has no exchange-specific → falls back to 0.0005
+    assert fees.withdrawal_fee("BTC", "Binance") == 0.0005
+
+
+def test_arb_wf_uses_ask_exchange_fee() -> None:
+    """wf in arb result uses ask exchange's withdrawal fee."""
+    fees = FeeRegistry(
+        taker={"Binance": 0.001, "Kraken": 0.004},
+        withdrawal={("Kraken", "BTC"): 0.0001},
+        fallback_withdrawal={"BTC": 0.0005},
+    )
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=60100.0, ask=60200.0, volume_quote=50_000),
+        _make_ticker("BTCUSDT", "Kraken", bid=59800.0, ask=60000.0, volume_quote=50_000),
+    ]
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
+    # Ask exchange is Kraken → 0.0001 BTC * 60100 bid = 6.01
+    assert result[0]["wf"] == round(0.0001 * 60100.0, 8)

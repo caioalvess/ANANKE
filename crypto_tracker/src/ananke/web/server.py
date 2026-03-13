@@ -175,6 +175,7 @@ def _compute_arbitrage(
             continue
 
         # Net profit after taker fees + withdrawal cost in quote
+        # Withdrawal is from ask_exchange (where we buy)
         if fees:
             net_pf = fees.net_profit_after_taker(
                 bid=bid,
@@ -182,10 +183,16 @@ def _compute_arbitrage(
                 bid_exchange=entry["max_bid_ex"],
                 ask_exchange=entry["min_ask_ex"],
             )
-            wf = round(fees.withdrawal_cost_quote(entry["base"], bid), 8)
+            wf = round(fees.withdrawal_cost_quote(
+                entry["base"], bid, exchange=entry["min_ask_ex"],
+            ), 8)
         else:
             net_pf = profit
             wf = 0.0
+
+        # True net profit: accounts for withdrawal fee relative to trade size
+        ref_size = arb_config.ref_trade_size if arb_config else 1000.0
+        tnpf = net_pf - (wf / ref_size) * 100 if ref_size > 0 and wf > 0 else net_pf
 
         results.append({
             "s": entry["symbol"],
@@ -197,6 +204,7 @@ def _compute_arbitrage(
             "ak": round(ask, 8),
             "pf": round(profit, 4),
             "npf": round(net_pf, 4),
+            "tnpf": round(tnpf, 4),
             "wf": wf,
             "bv": entry["max_bid_vol"],
             "av": entry["min_ask_vol"],
