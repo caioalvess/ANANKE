@@ -234,6 +234,13 @@
   .stale-label { color: var(--red); font-size: 9px; font-weight: 700; margin-left: 4px; }
   .depth-warn { color: var(--yellow); }
   .depth-na { color: #333; }
+
+  .table-empty {
+    text-align: center; padding: 40px 16px; color: var(--green-dark);
+    font-size: 12px; letter-spacing: 1px;
+  }
+  .table-empty .empty-icon { font-size: 20px; margin-bottom: 8px; color: var(--green-dim); }
+  .table-empty .empty-sub { font-size: 10px; color: #333; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -250,14 +257,15 @@
     <span class="ctrl-label">VIEW:</span>
     <button class="filter-btn view-btn active" data-view="tickers">TICKERS</button>
     <button class="filter-btn view-btn" data-view="arbitrage">ARBITRAGE</button>
+    <button class="filter-btn view-btn" data-view="triangular">TRIANGULAR</button>
 
     <span class="sep">|</span>
     <span class="ctrl-label">EXCHANGE:</span>
     <div id="exchangeBtns" style="display:inline-flex;gap:4px;"></div>
 
-    <span class="sep">|</span>
-    <span class="ctrl-label">QUOTE:</span>
-    <div id="quoteBtns" style="display:inline-flex;gap:4px;">
+    <span class="sep quote-filter">|</span>
+    <span class="ctrl-label quote-filter">QUOTE:</span>
+    <div id="quoteBtns" class="quote-filter" style="display:inline-flex;gap:4px;">
       <button class="filter-btn quote-btn active" data-q="USDT">USDT</button>
       <button class="filter-btn quote-btn" data-q="BTC">BTC</button>
       <button class="filter-btn quote-btn" data-q="ETH">ETH</button>
@@ -344,6 +352,19 @@
     </thead>
     <tbody id="arbTbody"></tbody>
   </table>
+  <table id="triTable" style="display:none;">
+    <thead>
+      <tr>
+        <th data-key="idx" data-table="tri" style="width:40px;">#</th>
+        <th data-key="ex" data-table="tri">EXCHANGE</th>
+        <th data-key="pf" data-table="tri" class="sorted">PROFIT %<span class="sort-arrow">&darr;</span></th>
+        <th data-key="path" data-table="tri">PATH</th>
+        <th data-key="nlegs" data-table="tri">LEGS<span class="sort-arrow">&darr;</span></th>
+        <th data-key="mvol" data-table="tri">MIN VOL<span class="sort-arrow">&darr;</span></th>
+      </tr>
+    </thead>
+    <tbody id="triTbody"></tbody>
+  </table>
 </div>
 
 <div class="footer">
@@ -361,6 +382,7 @@
   let currentView = 'tickers';
   let allTickers = [];
   let allArb = [];
+  let allTri = [];
   let activeExchanges = [];
   let prevPrices = {};
   let prevArbProfits = {};
@@ -376,24 +398,32 @@
   let arbMinProfit = 0;
   let arbMode = 'transfer';
 
+  // Triangular filters
+  let triExchangeFilter = '';
+
   // Shared
   let searchTerm = '';
   let sortKey = 'vq';
   let arbSortKey = 'tnpf';
+  let triSortKey = 'pf';
   let sortAsc = false;
   let arbSortAsc = false;
+  let triSortAsc = false;
   let page = 0;
   let totalPages = 1;
   let ws = null;
   let reconnectDelay = 1000;
   let tabsRendered = false;
   let serverTs = 0;
+  let dataReceived = { tickers: false, arbitrage: false, triangular: false };
 
   const $ = id => document.getElementById(id);
   const $tbody = $('tbody');
   const $arbTbody = $('arbTbody');
   const $table = $('mainTable');
   const $arbTable = $('arbTable');
+  const $triTable = $('triTable');
+  const $triTbody = $('triTbody');
   const $loading = $('loading');
   const $statusDot = $('statusDot');
   const $statusText = $('statusText');
@@ -442,6 +472,21 @@
     return '<a class="ex-link" href="'+tradeUrl(ex,base,quote)+'" target="_blank" rel="noopener">'+ex+'</a>';
   }
   function fI(v) { return v ? v.toLocaleString('en-US') : '\u2014'; }
+  function emptyRow(cols, view) {
+    if (!dataReceived[view]) {
+      return '<tr><td colspan="'+cols+'" class="table-empty">'+
+        '<div class="empty-icon">&#x25CE;</div>'+
+        'SCANNING...<div class="empty-sub">Waiting for exchange data</div></td></tr>';
+    }
+    const msgs = {
+      tickers: 'No pairs match current filters',
+      arbitrage: 'No cross-exchange opportunities detected',
+      triangular: 'No triangular cycles detected — prices are efficient',
+    };
+    return '<tr><td colspan="'+cols+'" class="table-empty">'+
+      '<div class="empty-icon">&#x2205;</div>'+
+      (msgs[view]||'No results')+'<div class="empty-sub">This is normal — opportunities are transient</div></td></tr>';
+  }
   function cc(v) { return v>0?'pos':v<0?'neg':'dim'; }
   function fAge(ms) {
     if (ms < 1000) return '<1s';
@@ -459,16 +504,26 @@
   }, 1000);
 
   // --- Active sort/render based on view ---
-  function getSort() { return currentView === 'arbitrage' ? {key: arbSortKey, asc: arbSortAsc} : {key: sortKey, asc: sortAsc}; }
-  function activeRender() { currentView === 'arbitrage' ? renderArb() : renderTickers(); }
+  function getSort() {
+    if (currentView === 'arbitrage') return {key: arbSortKey, asc: arbSortAsc};
+    if (currentView === 'triangular') return {key: triSortKey, asc: triSortAsc};
+    return {key: sortKey, asc: sortAsc};
+  }
+  function activeRender() {
+    if (currentView === 'arbitrage') renderArb();
+    else if (currentView === 'triangular') renderTri();
+    else renderTickers();
+  }
 
   // --- Send filters to server ---
   function sendFilters() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     if (currentView === 'tickers') {
       ws.send(JSON.stringify({view:'tickers', exchange:exchangeFilter, quote:quoteFilter}));
-    } else {
+    } else if (currentView === 'arbitrage') {
       ws.send(JSON.stringify({view:'arbitrage', arb_exchanges:arbExchangeFilter, arb_quote:arbQuoteFilter, arb_mode:arbMode}));
+    } else if (currentView === 'triangular') {
+      ws.send(JSON.stringify({view:'triangular', tri_exchange:triExchangeFilter}));
     }
   }
 
@@ -485,6 +540,7 @@
   function rebuildExBtns() {
     const exs = activeExchanges;
     const isArb = currentView === 'arbitrage';
+    const isTri = currentView === 'triangular';
 
     let h = '';
     if (isArb) {
@@ -495,6 +551,14 @@
         const ex = exs[i];
         const sel = arbExchangeFilter.includes(ex);
         h += '<button class="filter-btn exchange-btn'+(sel?' active':'')+'" data-ex="'+ex+'">'+ex.toUpperCase()+'</button>';
+      }
+    } else if (isTri) {
+      // Triangular: ALL + single-select
+      const isAll = !triExchangeFilter;
+      h += '<button class="filter-btn exchange-btn'+(isAll?' active':'')+'" data-ex="">ALL</button>';
+      for (let i = 0; i < exs.length; i++) {
+        const ex = exs[i];
+        h += '<button class="filter-btn exchange-btn'+(triExchangeFilter===ex?' active':'')+'" data-ex="'+ex+'">'+ex.toUpperCase()+'</button>';
       }
     } else {
       // Single-select mode for tickers
@@ -519,6 +583,9 @@
               arbExchangeFilter.push(ex);
             }
           }
+          rebuildExBtns();
+        } else if (isTri) {
+          triExchangeFilter = b.dataset.ex;
           rebuildExBtns();
         } else {
           $exBtns.querySelectorAll('.exchange-btn').forEach(x => x.classList.remove('active'));
@@ -550,16 +617,25 @@
 
     // Show/hide tables + arb-specific filters
     const isArb = view === 'arbitrage';
+    const isTri = view === 'triangular';
+    $table.style.display = 'none';
+    $arbTable.style.display = 'none';
+    $triTable.style.display = 'none';
     if (isArb) {
-      $table.style.display = 'none';
       $arbTable.style.display = '';
       $statsLabel.textContent = 'OPPS:';
+    } else if (isTri) {
+      $triTable.style.display = '';
+      $statsLabel.textContent = 'OPPS:';
     } else {
-      $arbTable.style.display = 'none';
       $table.style.display = '';
       $statsLabel.textContent = 'PAIRS:';
     }
     $arbFilters.forEach(el => { el.style.display = isArb ? '' : 'none'; });
+    // Hide quote filter for triangular (intra-exchange, all quotes matter)
+    document.querySelectorAll('.quote-filter').forEach(el => {
+      el.style.display = isTri ? 'none' : '';
+    });
 
     // Reset pagination
     page = 0;
@@ -570,6 +646,9 @@
     tabsRendered = false;
     rebuildExBtns();
     syncQuoteBtns();
+
+    // Show immediate feedback (scanning or empty) before server responds
+    activeRender();
     sendFilters();
   }
 
@@ -586,6 +665,7 @@
     ws.onclose = () => {
       $statusDot.classList.remove('connected');
       $statusText.textContent = 'RECONNECTING...';
+      dataReceived = { tickers: false, arbitrage: false, triangular: false };
       setTimeout(connect, reconnectDelay);
       reconnectDelay = Math.min(reconnectDelay*1.5, 10000);
     };
@@ -602,8 +682,21 @@
         $loading.style.display = 'none';
       }
 
-      if (msg.view === 'arbitrage') {
+      if (msg.view === 'triangular') {
+        if (!Array.isArray(msg.tri)) return;
+        dataReceived.triangular = true;
+        allTri = msg.tri;
+        if (msg.active) {
+          triExchangeFilter = msg.active.tri_exchange || '';
+          rebuildExBtns();
+        }
+        if (currentView === 'triangular') {
+          $triTable.style.display = '';
+          requestAnimationFrame(renderTri);
+        }
+      } else if (msg.view === 'arbitrage') {
         if (!Array.isArray(msg.arb)) return;
+        dataReceived.arbitrage = true;
         allArb = msg.arb;
         if (msg.active) {
           arbExchangeFilter = msg.active.arb_exchanges || [];
@@ -624,6 +717,7 @@
         }
       } else {
         if (!Array.isArray(msg.tickers)) return;
+        dataReceived.tickers = true;
         allTickers = msg.tickers;
         if (msg.active) {
           exchangeFilter = msg.active.exchange;
@@ -697,7 +791,11 @@
         '<td>'+fI(t.tc)+'</td>'+
         '</tr>';
     }
-    $tbody.innerHTML = buf.join('');
+    if (pageData.length === 0) {
+      $tbody.innerHTML = emptyRow(14, 'tickers');
+    } else {
+      $tbody.innerHTML = buf.join('');
+    }
     prevPrices = newPrev;
   }
 
@@ -800,8 +898,68 @@
         '<td class="'+arbAgeClass+'">'+fAge(arbAge)+staleLbl+'</td>'+
         '</tr>';
     }
-    $arbTbody.innerHTML = buf.join('');
+    if (pageData.length === 0) {
+      $arbTbody.innerHTML = emptyRow(17, 'arbitrage');
+    } else {
+      $arbTbody.innerHTML = buf.join('');
+    }
     prevArbProfits = newPrevArb;
+  }
+
+  // --- Render Triangular ---
+  function renderTri() {
+    let data = allTri;
+
+    if (searchTerm) {
+      const s = searchTerm.toUpperCase();
+      data = data.filter(o => o.path.toUpperCase().includes(s));
+    }
+
+    data.sort((a,b) => {
+      let va=a[triSortKey], vb=b[triSortKey];
+      if (typeof va==='string') return triSortAsc?va.localeCompare(vb):vb.localeCompare(va);
+      return triSortAsc?(va-vb):(vb-va);
+    });
+
+    const total = data.length;
+    totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (page >= totalPages) page = totalPages - 1;
+
+    $pairCount.textContent = total;
+    $pageInfo.textContent = (page+1)+'/'+totalPages;
+    $prevPage.disabled = page === 0;
+    $nextPage.disabled = page >= totalPages - 1;
+
+    const start = page * PAGE_SIZE;
+    const pageData = data.slice(start, start + PAGE_SIZE);
+
+    const buf = new Array(pageData.length);
+    for (let i=0; i<pageData.length; i++) {
+      const o = pageData[i];
+      const gi = start + i + 1;
+      const pfClass = o.pf >= 0.5 ? 'ylw' : o.pf > 0 ? 'pos' : 'dim';
+
+      // Build legs detail
+      let legsStr = '';
+      if (o.legs) {
+        legsStr = o.legs.map(l => l.sd.toUpperCase()+' '+l.p).join(' → ');
+      }
+
+      buf[i] =
+        '<tr>'+
+        '<td>'+gi+'</td>'+
+        '<td class="ex-tag" style="text-align:left;">'+o.ex+'</td>'+
+        '<td class="'+pfClass+'">'+o.pf.toFixed(3)+'%</td>'+
+        '<td style="text-align:left;color:#fff;">'+o.path+'</td>'+
+        '<td>'+o.nlegs+'</td>'+
+        '<td>'+fV(o.mvol)+'</td>'+
+        '</tr>';
+    }
+    if (pageData.length === 0) {
+      $triTbody.innerHTML = emptyRow(6, 'triangular');
+    } else {
+      $triTbody.innerHTML = buf.join('');
+    }
   }
 
   // --- View Toggle ---
@@ -882,6 +1040,8 @@
 
       if (tbl === 'arb') {
         if (arbSortKey===k) { arbSortAsc=!arbSortAsc; } else { arbSortKey=k; arbSortAsc=false; }
+      } else if (tbl === 'tri') {
+        if (triSortKey===k) { triSortAsc=!triSortAsc; } else { triSortKey=k; triSortAsc=false; }
       } else {
         if (sortKey===k) { sortAsc=!sortAsc; } else { sortKey=k; sortAsc=false; }
       }
@@ -891,7 +1051,7 @@
       parentTable.querySelectorAll('th').forEach(h => h.classList.remove('sorted'));
       th.classList.add('sorted');
       const ar = th.querySelector('.sort-arrow');
-      const isAsc = tbl === 'arb' ? arbSortAsc : sortAsc;
+      const isAsc = tbl === 'arb' ? arbSortAsc : tbl === 'tri' ? triSortAsc : sortAsc;
       if (ar) ar.textContent = isAsc?'\u25B2':'\u25BC';
       page = 0;
       activeRender();

@@ -23,6 +23,7 @@ from ananke.exchanges.manager import ExchangeManager
 from ananke.fee_registry import FeeRegistry, build_fee_registry
 from ananke.models import Ticker
 from ananke.orderbook import OrderBookProbe
+from ananke.triangular import compute_triangular_all
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,8 @@ class ClientState:
     arb_exchanges: list[str] = field(default_factory=list)
     arb_quote: str = "ALL"
     arb_mode: str = "transfer"  # "transfer" or "hedge"
+    # Triangular view filters
+    tri_exchange: str = ""  # single exchange (triangular is intra-exchange)
 
 
 def _serialize_ticker(t: Ticker) -> dict[str, str | int | float]:
@@ -305,7 +308,7 @@ async def _ws_handler(request: web.Request) -> web.WebSocketResponse:
 
                     if "view" in data:
                         v = str(data["view"])
-                        if v in ("tickers", "arbitrage"):
+                        if v in ("tickers", "arbitrage", "triangular"):
                             state.view = v
 
                     # Ticker view filters
@@ -332,6 +335,10 @@ async def _ws_handler(request: web.Request) -> web.WebSocketResponse:
                         m = str(data["arb_mode"])
                         if m in ("transfer", "hedge"):
                             state.arb_mode = m
+                    if "tri_exchange" in data:
+                        tex = str(data["tri_exchange"])
+                        if tex in valid_exchanges or tex == "":
+                            state.tri_exchange = tex
 
                 except (json.JSONDecodeError, TypeError):
                     pass
@@ -362,6 +369,7 @@ async def _broadcast_loop(app: web.Application) -> None:
             arb_groups: dict[
                 tuple[str, frozenset[str], str], list[ClientState]
             ] = {}
+            tri_groups: dict[str, list[ClientState]] = {}
 
             for state in list(clients.values()):
                 if state.view == "arbitrage":
@@ -371,6 +379,10 @@ async def _broadcast_loop(app: web.Application) -> None:
                         state.arb_quote,
                     )
                     arb_groups.setdefault(key, []).append(state)
+                elif state.view == "triangular":
+                    tri_groups.setdefault(
+                        state.tri_exchange, [],
+                    ).append(state)
                 else:
                     key = (state.exchange, state.quote)
                     ticker_groups.setdefault(key, []).append(state)
@@ -433,6 +445,36 @@ async def _broadcast_loop(app: web.Application) -> None:
                                 "arb_quote": arb_q,
                                 "arb_mode": arb_mode,
                             },
+                            "server_ts": server_ts,
+                        },
+                        separators=(",", ":"),
+                    )
+                    for state in group_clients:
+                        try:
+                            await state.ws.send_str(payload)
+                        except (ConnectionError, OSError):
+                            dead.append(id(state.ws))
+
+            # --- Triangular broadcasts ---
+            if tri_groups:
+                taker_fees = {
+                    ex: fees.taker_fee(ex) for ex in exchanges
+                } if fees else None
+                tri_cache: dict[str, list[dict]] = {}
+
+                for tri_ex, group_clients in tri_groups.items():
+                    if tri_ex not in tri_cache:
+                        tri_cache[tri_ex] = compute_triangular_all(
+                            all_tickers,
+                            taker_fees=taker_fees,
+                            exchange_filter=tri_ex,
+                        )
+                    payload = json.dumps(
+                        {
+                            "view": "triangular",
+                            "tri": tri_cache[tri_ex],
+                            "exchanges": exchanges,
+                            "active": {"tri_exchange": tri_ex},
                             "server_ts": server_ts,
                         },
                         separators=(",", ":"),
