@@ -98,6 +98,9 @@ class ArbitrageConfig:
     max_pair_spread_pct: float = 5.0     # max bid-ask spread % per individual pair
     min_profit_pct: float = 0.0          # min gross profit % to include (0 = all)
     ref_trade_size: float = 1_000.0      # reference trade size in quote for tnpf calc
+    depth_enabled: bool = True           # on-demand order book depth probing
+    depth_trade_sizes: tuple[float, ...] = (500.0, 1000.0, 5000.0)
+    depth_top_n: int = 20               # enrich top N opportunities with depth
 
 
 @dataclass(frozen=True)
@@ -230,6 +233,11 @@ def load_config() -> AppConfig:
             ),
             ref_trade_size=_env_float(
                 "ANANKE_ARB_REF_TRADE_SIZE", ArbitrageConfig.ref_trade_size,
+            ),
+            depth_enabled=_env("ANANKE_ARB_DEPTH_ENABLED", "true").lower()
+            not in ("false", "0", "no"),
+            depth_top_n=_env_int(
+                "ANANKE_ARB_DEPTH_TOP_N", ArbitrageConfig.depth_top_n,
             ),
         ),
         web=WebConfig(

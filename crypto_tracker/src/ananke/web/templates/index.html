@@ -232,6 +232,8 @@
   .age-warn { color: var(--yellow); }
   .age-old { color: var(--red); }
   .stale-label { color: var(--red); font-size: 9px; font-weight: 700; margin-left: 4px; }
+  .depth-warn { color: var(--yellow); }
+  .depth-na { color: #333; }
 </style>
 </head>
 <body>
@@ -334,6 +336,8 @@
         <th data-key="av" data-table="arb">VOL COMPRA<span class="sort-arrow">&darr;</span></th>
         <th data-key="bv" data-table="arb">VOL VENDA<span class="sort-arrow">&darr;</span></th>
         <th data-key="msv" data-table="arb">MIN VOL<span class="sort-arrow">&darr;</span></th>
+        <th data-key="ex1k" data-table="arb">EXEC $1K<span class="sort-arrow">&darr;</span></th>
+        <th data-key="mdq" data-table="arb">DEPTH<span class="sort-arrow">&darr;</span></th>
         <th data-key="rc" data-table="arb" class="hedge-only">REBAL COST<span class="sort-arrow">&darr;</span></th>
         <th data-key="age" data-table="arb">AGE<span class="sort-arrow">&darr;</span></th>
       </tr>
@@ -757,6 +761,24 @@
 
       const rcStr = o.rc > 0 ? '~'+fP(o.rc) : '\u2014';
 
+      // Depth columns
+      let ex1kStr, ex1kClass;
+      if (o.ex1k != null) {
+        ex1kStr = o.ex1k.toFixed(3)+'%';
+        ex1kClass = o.ex1k < 0 ? 'neg' : o.ex1k >= 0.5 ? 'ylw' : o.ex1k > 0 ? 'pos' : 'dim';
+      } else {
+        ex1kStr = '\u2014';
+        ex1kClass = 'depth-na';
+      }
+      let mdqStr, mdqClass;
+      if (o.mdq != null) {
+        mdqStr = fV(o.mdq);
+        mdqClass = o.mdq < 1000 ? 'depth-warn' : '';
+      } else {
+        mdqStr = '\u2014';
+        mdqClass = 'depth-na';
+      }
+
       buf[i] =
         '<tr class="'+fc+staleRowClass+'">'+
         '<td>'+gi+'</td>'+
@@ -772,6 +794,8 @@
         '<td>'+fV(o.av)+'</td>'+
         '<td>'+fV(o.bv)+'</td>'+
         '<td>'+fV(o.msv)+'</td>'+
+        '<td class="'+ex1kClass+'">'+ex1kStr+'</td>'+
+        '<td class="'+mdqClass+'">'+mdqStr+'</td>'+
         '<td class="hedge-only">'+rcStr+'</td>'+
         '<td class="'+arbAgeClass+'">'+fAge(arbAge)+staleLbl+'</td>'+
         '</tr>';

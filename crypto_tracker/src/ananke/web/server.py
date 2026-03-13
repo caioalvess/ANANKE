@@ -22,6 +22,7 @@ from ananke.config import ArbitrageConfig, WebConfig
 from ananke.exchanges.manager import ExchangeManager
 from ananke.fee_registry import FeeRegistry, build_fee_registry
 from ananke.models import Ticker
+from ananke.orderbook import OrderBookProbe
 
 logger = logging.getLogger(__name__)
 
@@ -349,6 +350,7 @@ async def _broadcast_loop(app: web.Application) -> None:
     registry: CoinRegistry = app["coin_registry"]
     fees: FeeRegistry = app["fee_registry"]
     arb_config: ArbitrageConfig = app["arb_config"]
+    depth_probe: OrderBookProbe | None = app.get("depth_probe")
 
     while True:
         if clients and manager.has_data():
@@ -406,6 +408,18 @@ async def _broadcast_loop(app: web.Application) -> None:
                             all_tickers, registry, fees, arb_config,
                             mode=arb_mode,
                         )
+                        if depth_probe:
+                            try:
+                                await depth_probe.enrich_arb_results(
+                                    arb_by_mode[arb_mode],
+                                    top_n=arb_config.depth_top_n,
+                                    trade_size=arb_config.ref_trade_size,
+                                    fees=fees,
+                                )
+                            except Exception:
+                                logger.debug(
+                                    "Depth enrichment failed", exc_info=True,
+                                )
                     filtered = _filter_arbitrage(
                         arb_by_mode[arb_mode], list(arb_exs), arb_q,
                     )
@@ -444,6 +458,9 @@ async def _on_cleanup(app: web.Application) -> None:
     task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await task
+    probe: OrderBookProbe | None = app.get("depth_probe")
+    if probe:
+        await probe.close()
 
 
 async def start_web(
@@ -458,6 +475,8 @@ async def start_web(
     registry = await build_registry()
     fees = await build_fee_registry()
 
+    depth_probe = OrderBookProbe() if arb_config.depth_enabled else None
+
     app = web.Application()
     app["manager"] = manager
     app["clients"] = {}
@@ -465,6 +484,7 @@ async def start_web(
     app["arb_config"] = arb_config
     app["coin_registry"] = registry
     app["fee_registry"] = fees
+    app["depth_probe"] = depth_probe
     app.on_startup.append(_on_startup)
     app.on_cleanup.append(_on_cleanup)
 
