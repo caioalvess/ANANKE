@@ -22,6 +22,7 @@ from ananke.coin_registry import CoinRegistry, build_registry
 from ananke.config import AlertConfig, ArbitrageConfig, WebConfig
 from ananke.exchanges.manager import ExchangeManager
 from ananke.fee_registry import FeeRegistry, build_fee_registry
+from ananke.metrics import MetricsCollector
 from ananke.models import Ticker
 from ananke.orderbook import OrderBookProbe
 from ananke.triangular import compute_triangular_all
@@ -285,6 +286,13 @@ async def _index_handler(request: web.Request) -> web.Response:
     return web.Response(text=html, content_type="text/html", charset="utf-8")
 
 
+async def _metrics_handler(request: web.Request) -> web.Response:
+    """REST endpoint for metrics data."""
+    metrics: MetricsCollector = request.app["metrics"]
+    data = metrics.get_metrics()
+    return web.json_response(data)
+
+
 async def _ws_handler(request: web.Request) -> web.WebSocketResponse:
     """Handle browser WebSocket connections with per-client filtering."""
     clients: dict[int, ClientState] = request.app["clients"]
@@ -309,7 +317,7 @@ async def _ws_handler(request: web.Request) -> web.WebSocketResponse:
 
                     if "view" in data:
                         v = str(data["view"])
-                        if v in ("tickers", "arbitrage", "triangular"):
+                        if v in ("tickers", "arbitrage", "triangular", "metrics"):
                             state.view = v
 
                     # Ticker view filters
@@ -360,6 +368,7 @@ async def _broadcast_loop(app: web.Application) -> None:
     arb_config: ArbitrageConfig = app["arb_config"]
     depth_probe: OrderBookProbe | None = app.get("depth_probe")
     alert_engine: AlertEngine | None = app.get("alert_engine")
+    metrics: MetricsCollector = app["metrics"]
 
     while True:
         if clients and manager.has_data():
@@ -372,9 +381,12 @@ async def _broadcast_loop(app: web.Application) -> None:
                 tuple[str, frozenset[str], str], list[ClientState]
             ] = {}
             tri_groups: dict[str, list[ClientState]] = {}
+            metrics_clients: list[ClientState] = []
 
             for state in list(clients.values()):
-                if state.view == "arbitrage":
+                if state.view == "metrics":
+                    metrics_clients.append(state)
+                elif state.view == "arbitrage":
                     key = (
                         state.arb_mode,
                         frozenset(state.arb_exchanges),
@@ -413,10 +425,9 @@ async def _broadcast_loop(app: web.Application) -> None:
                         dead.append(id(state.ws))
 
             # --- Arbitrage broadcasts (compute once per mode, filter per group) ---
-            if arb_groups:
-                arb_by_mode: dict[str, list[dict[str, str | float]]] = {}
-
-                for (arb_mode, arb_exs, arb_q), group_clients in arb_groups.items():
+            arb_by_mode: dict[str, list[dict[str, str | float]]] = {}
+            if arb_groups or metrics_clients or (alert_engine and alert_engine.enabled):
+                for (arb_mode, _arb_exs, _arb_q), _group_clients in arb_groups.items():
                     if arb_mode not in arb_by_mode:
                         arb_by_mode[arb_mode] = _compute_arbitrage(
                             all_tickers, registry, fees, arb_config,
@@ -434,6 +445,22 @@ async def _broadcast_loop(app: web.Application) -> None:
                                 logger.debug(
                                     "Depth enrichment failed", exc_info=True,
                                 )
+
+                # Record metrics from the default mode (transfer)
+                default_arb = arb_by_mode.get("transfer")
+                if default_arb is None:
+                    default_arb = _compute_arbitrage(
+                        all_tickers, registry, fees, arb_config,
+                        mode="transfer",
+                    )
+                    arb_by_mode["transfer"] = default_arb
+                metrics.record(default_arb)
+
+                # Enrich arb results with freq/dur
+                for mode_results in arb_by_mode.values():
+                    metrics.enrich_arb_results(mode_results)
+
+                for (arb_mode, arb_exs, arb_q), group_clients in arb_groups.items():
                     filtered = _filter_arbitrage(
                         arb_by_mode[arb_mode], list(arb_exs), arb_q,
                     )
@@ -460,8 +487,6 @@ async def _broadcast_loop(app: web.Application) -> None:
             # --- Alert check (fire-and-forget) ---
             if alert_engine and alert_engine.enabled:
                 alert_mode = alert_engine._alert_mode
-                if not arb_groups:
-                    arb_by_mode = {}
                 if alert_mode not in arb_by_mode:
                     arb_by_mode[alert_mode] = _compute_arbitrage(
                         all_tickers, registry, fees, arb_config,
@@ -501,6 +526,24 @@ async def _broadcast_loop(app: web.Application) -> None:
                         except (ConnectionError, OSError):
                             dead.append(id(state.ws))
 
+            # --- Metrics broadcasts ---
+            if metrics_clients:
+                metrics_data = metrics.get_metrics()
+                payload = json.dumps(
+                    {
+                        "view": "metrics",
+                        "metrics": metrics_data,
+                        "exchanges": exchanges,
+                        "server_ts": server_ts,
+                    },
+                    separators=(",", ":"),
+                )
+                for state in metrics_clients:
+                    try:
+                        await state.ws.send_str(payload)
+                    except (ConnectionError, OSError):
+                        dead.append(id(state.ws))
+
             for cid in dead:
                 clients.pop(cid, None)
 
@@ -539,6 +582,7 @@ async def start_web(
     fees = await build_fee_registry()
 
     depth_probe = OrderBookProbe() if arb_config.depth_enabled else None
+    metrics_collector = MetricsCollector()
 
     # Alert engine — zero overhead if token/chat_id not set
     alert_engine: AlertEngine | None = None
@@ -562,11 +606,13 @@ async def start_web(
     app["fee_registry"] = fees
     app["depth_probe"] = depth_probe
     app["alert_engine"] = alert_engine
+    app["metrics"] = metrics_collector
     app.on_startup.append(_on_startup)
     app.on_cleanup.append(_on_cleanup)
 
     app.router.add_get("/", _index_handler)
     app.router.add_get("/ws", _ws_handler)
+    app.router.add_get("/api/metrics", _metrics_handler)
 
     runner = web.AppRunner(app)
     await runner.setup()

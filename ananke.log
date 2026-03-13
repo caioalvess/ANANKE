@@ -3092,3 +3092,173 @@ asyncio.exceptions.CancelledError
 2026-03-12 22:23:40,163 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
 2026-03-12 22:23:44,772 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
 2026-03-12 22:23:49,449 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:23:54,095 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:23:58,670 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:04,245 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:08,754 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:13,281 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:17,883 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:22,446 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:27,099 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:31,765 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:36,330 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:40,978 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:45,627 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:50,196 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:54,817 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:24:59,354 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:04,005 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:07,560 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:12,097 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:17,035 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:21,540 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:25,089 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:29,789 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:34,341 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:38,951 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:43,492 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:48,063 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:52,592 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:25:57,113 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:01,829 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:06,428 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:11,024 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:15,741 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:20,312 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:24,804 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:29,428 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:34,009 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:38,569 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:43,101 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:47,595 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:52,154 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:26:56,860 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:01,451 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:06,058 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:10,772 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:16,289 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:21,865 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:26,451 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:31,024 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:35,544 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:40,031 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:44,551 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:49,118 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:53,680 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:27:58,270 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:28:07,914 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:28:12,469 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:28:16,953 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:28:21,602 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:28:27,309 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:28:31,829 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:28:36,385 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:28:41,057 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:28:50,669 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:28:55,199 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:00,782 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:05,437 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:10,165 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:14,736 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:19,254 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:23,825 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:28,511 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:34,141 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:38,722 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:43,286 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:29:47,903 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-03-12 22:34:21,322 [aiohttp.server] ERROR: Unhandled exception
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 640, in run_until_complete
+    self.run_forever()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 607, in run_forever
+    self._run_once()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 1884, in _run_once
+    event_list = self._selector.select(timeout)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/selectors.py", line 468, in select
+    fd_event_list = self._selector.poll(timeout, max_ev)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 510, in _handle_request
+    resp = await request_handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_app.py", line 569, in _handle
+    return await handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/dados/ANANKE/crypto_tracker/src/ananke/web/server.py", line 304, in _ws_handler
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_ws.py", line 620, in __anext__
+    msg = await self.receive()
+          ^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_ws.py", line 545, in receive
+    msg = await self._reader.read()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "aiohttp/_websocket/reader_c.py", line 118, in read
+  File "aiohttp/_websocket/reader_c.py", line 115, in aiohttp._websocket.reader_c.WebSocketDataQueue.read
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 602, in start
+    resp, reset = await task
+                  ^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 539, in _handle_request
+    self._handler_waiter.set_result(None)
+asyncio.exceptions.InvalidStateError: invalid state
+2026-03-12 22:34:21,477 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fc21e53f750>
+2026-03-12 22:34:21,477 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fc21f7f5f90>
+2026-03-12 22:34:21,477 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fc21db39fd0>
+2026-03-12 22:34:21,477 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fc21db3ab50>
+2026-03-12 22:34:21,478 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fc21db3b810>
+2026-03-12 22:34:21,478 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fc21db38350>
+2026-03-12 22:34:21,478 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-27' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-12 22:34:21,478 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-28' coro=<BybitExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/bybit.py:109> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-12 22:34:21,478 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-30' coro=<OkxExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/okx.py:96> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-12 22:34:21,478 [asyncio] ERROR: Task exception was never retrieved
+future: <Task finished name='Task-32' coro=<KrakenExchange._ws_listen() done, defined at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py:149> exception=InvalidStatus(Response(status_code=429, reason_phrase='Too Many Requests', headers=Headers([('Date', 'Fri, 13 Mar 2026 01:29:50 GMT'), ('Content-Type', 'text/plain; charset=UTF-8'), ('Content-Length', '16'), ('Connection', 'keep-alive'), ('Retry-After', '600'), ('X-Frame-Options', 'SAMEORIGIN'), ('Referrer-Policy', 'same-origin'), ('Cache-Control', 'private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0'), ('Expires', 'Thu, 01 Jan 1970 00:00:01 GMT'), ('Set-Cookie', '__cf_bm=09PzXlVR_AmgoGjjmOW.Q5j1e0KNmUruciqCIBET9eY-1773365390-1.0.1.1-KLmGgtjgRv6nLGa.ZKpolDY7S5dkTM.m9LE79c0jvnm4EwG09dzA5O54woOkuBFfo6LE4F8jNCDBshTbWPz8_j6ZETs5sa5amRGPCR0rcpY; path=/; expires=Fri, 13-Mar-26 01:59:50 GMT; domain=.kraken.com; HttpOnly; Secure; SameSite=None'), ('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload'), ('X-Content-Type-Options', 'nosniff'), ('Set-Cookie', '_cfuvid=HHhh2W8SKaQv.PDzXz1JZHMCqz8o.as9C7BTxQwEqd0-1773365390988-0.0.1.1-604800000; path=/; domain=.kraken.com; HttpOnly; Secure; SameSite=None'), ('Server', 'cloudflare'), ('CF-RAY', '9db7451d9e12648a-GIG')]), body=bytearray(b'error code: 1015'), _exception=InvalidStatus(...)))>
+Traceback (most recent call last):
+  File "/dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py", line 153, in _ws_listen
+    async with websockets.connect(
+  File "/home/caio/.local/lib/python3.11/site-packages/websockets/asyncio/client.py", line 590, in __aenter__
+    return await self
+           ^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/websockets/asyncio/client.py", line 546, in __await_impl__
+    await self.connection.handshake(
+  File "/home/caio/.local/lib/python3.11/site-packages/websockets/asyncio/client.py", line 115, in handshake
+    raise self.protocol.handshake_exc
+  File "/home/caio/.local/lib/python3.11/site-packages/websockets/client.py", line 327, in parse
+    self.process_response(response)
+  File "/home/caio/.local/lib/python3.11/site-packages/websockets/client.py", line 144, in process_response
+    raise InvalidStatus(response)
+websockets.exceptions.InvalidStatus: server rejected WebSocket connection: HTTP 429
+2026-03-12 22:34:21,479 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-34' coro=<KucoinExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kucoin.py:143> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-12 22:34:21,479 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-36' coro=<GateioExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/gateio.py:103> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-12 22:34:21,480 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fc20ded3c50>
+2026-03-12 22:34:21,480 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fc1fb7058d0>, 132128.286878135), (<aiohttp.client_proto.ResponseHandler object at 0x7fc1fb706f20>, 132128.305015122), (<aiohttp.client_proto.ResponseHandler object at 0x7fc21db24c20>, 132128.507409181), (<aiohttp.client_proto.ResponseHandler object at 0x7fc21db25f60>, 132128.515652841), (<aiohttp.client_proto.ResponseHandler object at 0x7fc21db26510>, 132128.515990882)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fc1fb707af0>, 132128.650374874), (<aiohttp.client_proto.ResponseHandler object at 0x7fc1fb707d90>, 132128.778673041), (<aiohttp.client_proto.ResponseHandler object at 0x7fc1fc4900c0>, 132128.918131081), (<aiohttp.client_proto.ResponseHandler object at 0x7fc1fb707f50>, 132128.928260869), (<aiohttp.client_proto.ResponseHandler object at 0x7fc1fb707bd0>, 132129.194676791)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fc20ded20d0>

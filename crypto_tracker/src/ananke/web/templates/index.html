@@ -241,6 +241,14 @@
   }
   .table-empty .empty-icon { font-size: 20px; margin-bottom: 8px; color: var(--green-dim); }
   .table-empty .empty-sub { font-size: 10px; color: #333; margin-top: 6px; }
+
+  .metric-card {
+    background: #0d1a0d; border: 1px solid var(--green-dark);
+    padding: 10px 16px; min-width: 140px; flex: 1;
+  }
+  .metric-card .mc-label { font-size: 9px; color: var(--cyan); letter-spacing: 1px; text-transform: uppercase; }
+  .metric-card .mc-value { font-size: 18px; color: var(--green); font-weight: 700; margin-top: 4px; }
+  .metric-card .mc-sub { font-size: 10px; color: var(--green-dark); margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -258,10 +266,11 @@
     <button class="filter-btn view-btn active" data-view="tickers">TICKERS</button>
     <button class="filter-btn view-btn" data-view="arbitrage">ARBITRAGE</button>
     <button class="filter-btn view-btn" data-view="triangular">TRIANGULAR</button>
+    <button class="filter-btn view-btn" data-view="metrics">METRICS</button>
 
-    <span class="sep">|</span>
-    <span class="ctrl-label">EXCHANGE:</span>
-    <div id="exchangeBtns" style="display:inline-flex;gap:4px;"></div>
+    <span class="sep exchange-filter">|</span>
+    <span class="ctrl-label exchange-filter">EXCHANGE:</span>
+    <div id="exchangeBtns" class="exchange-filter" style="display:inline-flex;gap:4px;"></div>
 
     <span class="sep quote-filter">|</span>
     <span class="ctrl-label quote-filter">QUOTE:</span>
@@ -348,6 +357,8 @@
         <th data-key="mdq" data-table="arb">DEPTH<span class="sort-arrow">&darr;</span></th>
         <th data-key="rc" data-table="arb" class="hedge-only">REBAL COST<span class="sort-arrow">&darr;</span></th>
         <th data-key="age" data-table="arb">AGE<span class="sort-arrow">&darr;</span></th>
+        <th data-key="freq" data-table="arb">FREQ<span class="sort-arrow">&darr;</span></th>
+        <th data-key="dur" data-table="arb">DUR<span class="sort-arrow">&darr;</span></th>
       </tr>
     </thead>
     <tbody id="arbTbody"></tbody>
@@ -365,6 +376,24 @@
     </thead>
     <tbody id="triTbody"></tbody>
   </table>
+  <div id="metricsView" style="display:none;">
+    <div id="metricsCards" style="display:flex;gap:16px;padding:12px 16px;flex-wrap:wrap;"></div>
+    <table id="metricsTable">
+      <thead>
+        <tr>
+          <th data-key="idx" data-table="met" style="width:40px;">#</th>
+          <th data-key="key" data-table="met">PAR</th>
+          <th data-key="freq" data-table="met" class="sorted">FREQ<span class="sort-arrow">&darr;</span></th>
+          <th data-key="spread_avg" data-table="met">AVG SPREAD<span class="sort-arrow">&darr;</span></th>
+          <th data-key="spread_max" data-table="met">MAX SPREAD<span class="sort-arrow">&darr;</span></th>
+          <th data-key="dur" data-table="met">DUR<span class="sort-arrow">&darr;</span></th>
+          <th data-key="ax" data-table="met">ASK EX</th>
+          <th data-key="bx" data-table="met">BID EX</th>
+        </tr>
+      </thead>
+      <tbody id="metricsTbody"></tbody>
+    </table>
+  </div>
 </div>
 
 <div class="footer">
@@ -383,6 +412,7 @@
   let allTickers = [];
   let allArb = [];
   let allTri = [];
+  let allMetrics = null;
   let activeExchanges = [];
   let prevPrices = {};
   let prevArbProfits = {};
@@ -401,6 +431,10 @@
   // Triangular filters
   let triExchangeFilter = '';
 
+  // Metrics sort
+  let metSortKey = 'freq';
+  let metSortAsc = false;
+
   // Shared
   let searchTerm = '';
   let sortKey = 'vq';
@@ -415,7 +449,7 @@
   let reconnectDelay = 1000;
   let tabsRendered = false;
   let serverTs = 0;
-  let dataReceived = { tickers: false, arbitrage: false, triangular: false };
+  let dataReceived = { tickers: false, arbitrage: false, triangular: false, metrics: false };
 
   const $ = id => document.getElementById(id);
   const $tbody = $('tbody');
@@ -424,6 +458,9 @@
   const $arbTable = $('arbTable');
   const $triTable = $('triTable');
   const $triTbody = $('triTbody');
+  const $metricsView = $('metricsView');
+  const $metricsCards = $('metricsCards');
+  const $metricsTbody = $('metricsTbody');
   const $loading = $('loading');
   const $statusDot = $('statusDot');
   const $statusText = $('statusText');
@@ -482,6 +519,7 @@
       tickers: 'No pairs match current filters',
       arbitrage: 'No cross-exchange opportunities detected',
       triangular: 'No triangular cycles detected — prices are efficient',
+      metrics: 'No metrics data yet — waiting for arbitrage snapshots',
     };
     return '<tr><td colspan="'+cols+'" class="table-empty">'+
       '<div class="empty-icon">&#x2205;</div>'+
@@ -507,11 +545,13 @@
   function getSort() {
     if (currentView === 'arbitrage') return {key: arbSortKey, asc: arbSortAsc};
     if (currentView === 'triangular') return {key: triSortKey, asc: triSortAsc};
+    if (currentView === 'metrics') return {key: metSortKey, asc: metSortAsc};
     return {key: sortKey, asc: sortAsc};
   }
   function activeRender() {
     if (currentView === 'arbitrage') renderArb();
     else if (currentView === 'triangular') renderTri();
+    else if (currentView === 'metrics') renderMetrics();
     else renderTickers();
   }
 
@@ -524,6 +564,8 @@
       ws.send(JSON.stringify({view:'arbitrage', arb_exchanges:arbExchangeFilter, arb_quote:arbQuoteFilter, arb_mode:arbMode}));
     } else if (currentView === 'triangular') {
       ws.send(JSON.stringify({view:'triangular', tri_exchange:triExchangeFilter}));
+    } else if (currentView === 'metrics') {
+      ws.send(JSON.stringify({view:'metrics'}));
     }
   }
 
@@ -618,23 +660,32 @@
     // Show/hide tables + arb-specific filters
     const isArb = view === 'arbitrage';
     const isTri = view === 'triangular';
+    const isMet = view === 'metrics';
     $table.style.display = 'none';
     $arbTable.style.display = 'none';
     $triTable.style.display = 'none';
+    $metricsView.style.display = 'none';
     if (isArb) {
       $arbTable.style.display = '';
       $statsLabel.textContent = 'OPPS:';
     } else if (isTri) {
       $triTable.style.display = '';
       $statsLabel.textContent = 'OPPS:';
+    } else if (isMet) {
+      $metricsView.style.display = '';
+      $statsLabel.textContent = 'PAIRS:';
     } else {
       $table.style.display = '';
       $statsLabel.textContent = 'PAIRS:';
     }
     $arbFilters.forEach(el => { el.style.display = isArb ? '' : 'none'; });
-    // Hide quote filter for triangular (intra-exchange, all quotes matter)
+    // Hide quote filter for triangular & metrics
     document.querySelectorAll('.quote-filter').forEach(el => {
-      el.style.display = isTri ? 'none' : '';
+      el.style.display = (isTri || isMet) ? 'none' : '';
+    });
+    // Hide exchange filter for metrics
+    document.querySelectorAll('.exchange-filter').forEach(el => {
+      el.style.display = isMet ? 'none' : '';
     });
 
     // Reset pagination
@@ -665,7 +716,7 @@
     ws.onclose = () => {
       $statusDot.classList.remove('connected');
       $statusText.textContent = 'RECONNECTING...';
-      dataReceived = { tickers: false, arbitrage: false, triangular: false };
+      dataReceived = { tickers: false, arbitrage: false, triangular: false, metrics: false };
       setTimeout(connect, reconnectDelay);
       reconnectDelay = Math.min(reconnectDelay*1.5, 10000);
     };
@@ -682,7 +733,14 @@
         $loading.style.display = 'none';
       }
 
-      if (msg.view === 'triangular') {
+      if (msg.view === 'metrics') {
+        dataReceived.metrics = true;
+        allMetrics = msg.metrics || null;
+        if (currentView === 'metrics') {
+          $metricsView.style.display = '';
+          requestAnimationFrame(renderMetrics);
+        }
+      } else if (msg.view === 'triangular') {
         if (!Array.isArray(msg.tri)) return;
         dataReceived.triangular = true;
         allTri = msg.tri;
@@ -896,10 +954,12 @@
         '<td class="'+mdqClass+'">'+mdqStr+'</td>'+
         '<td class="hedge-only">'+rcStr+'</td>'+
         '<td class="'+arbAgeClass+'">'+fAge(arbAge)+staleLbl+'</td>'+
+        '<td>'+(o.freq||0)+'</td>'+
+        '<td>'+(o.dur?fAge(o.dur*1000):'\u2014')+'</td>'+
         '</tr>';
     }
     if (pageData.length === 0) {
-      $arbTbody.innerHTML = emptyRow(17, 'arbitrage');
+      $arbTbody.innerHTML = emptyRow(19, 'arbitrage');
     } else {
       $arbTbody.innerHTML = buf.join('');
     }
@@ -960,6 +1020,73 @@
     } else {
       $triTbody.innerHTML = buf.join('');
     }
+  }
+
+  // --- Render Metrics ---
+  function renderMetrics() {
+    if (!allMetrics) {
+      $metricsCards.innerHTML = '';
+      $metricsTbody.innerHTML = emptyRow(8, 'metrics');
+      $pairCount.textContent = '0';
+      $pageInfo.textContent = '1/1';
+      return;
+    }
+    const g = allMetrics.global || {};
+    $metricsCards.innerHTML =
+      '<div class="metric-card"><div class="mc-label">Active Now</div><div class="mc-value">'+(g.total_now||0)+'</div></div>'+
+      '<div class="metric-card"><div class="mc-label">Seen (5m)</div><div class="mc-value">'+(g.total_5m||0)+'</div></div>'+
+      '<div class="metric-card"><div class="mc-label">Avg Spread</div><div class="mc-value">'+(g.avg_spread||0).toFixed(3)+'%</div></div>'+
+      '<div class="metric-card"><div class="mc-label">Buffer</div><div class="mc-value">'+Math.round(allMetrics.buffer_sec||0)+'s</div><div class="mc-sub">of '+allMetrics.window_sec+'s window</div></div>'+
+      (g.top_exchanges && g.top_exchanges.length>0 ?
+        '<div class="metric-card"><div class="mc-label">Top Exchanges</div><div class="mc-value" style="font-size:12px;">'+
+        g.top_exchanges.slice(0,5).map(e => e.ex+' ('+e.count+')').join(', ')+
+        '</div></div>' : '');
+
+    let data = allMetrics.pairs || [];
+    if (searchTerm) {
+      const s = searchTerm.toUpperCase();
+      data = data.filter(p => p.key.toUpperCase().includes(s));
+    }
+    data.sort((a,b) => {
+      let va=a[metSortKey], vb=b[metSortKey];
+      if (typeof va==='string') return metSortAsc?va.localeCompare(vb):vb.localeCompare(va);
+      return metSortAsc?(va-vb):(vb-va);
+    });
+
+    const total = data.length;
+    totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (page >= totalPages) page = totalPages - 1;
+    $pairCount.textContent = total;
+    $pageInfo.textContent = (page+1)+'/'+totalPages;
+    $prevPage.disabled = page === 0;
+    $nextPage.disabled = page >= totalPages - 1;
+
+    const start = page * PAGE_SIZE;
+    const pageData = data.slice(start, start + PAGE_SIZE);
+
+    if (pageData.length === 0) {
+      $metricsTbody.innerHTML = emptyRow(8, 'metrics');
+      return;
+    }
+
+    const buf = new Array(pageData.length);
+    for (let i=0; i<pageData.length; i++) {
+      const p = pageData[i];
+      const gi = start + i + 1;
+      const activeClass = p.active ? 'pos' : 'dim';
+      buf[i] =
+        '<tr>'+
+        '<td>'+gi+'</td>'+
+        '<td class="pair-cell"><span class="pair-base">'+p.b+'</span><span class="pair-quote">/'+p.q+'</span></td>'+
+        '<td class="'+activeClass+'">'+p.freq+'</td>'+
+        '<td>'+p.spread_avg.toFixed(3)+'%</td>'+
+        '<td class="ylw">'+p.spread_max.toFixed(3)+'%</td>'+
+        '<td>'+(p.dur>0?fAge(p.dur*1000):'\u2014')+'</td>'+
+        '<td class="ex-tag">'+p.ax+'</td>'+
+        '<td class="ex-tag">'+p.bx+'</td>'+
+        '</tr>';
+    }
+    $metricsTbody.innerHTML = buf.join('');
   }
 
   // --- View Toggle ---
@@ -1042,6 +1169,8 @@
         if (arbSortKey===k) { arbSortAsc=!arbSortAsc; } else { arbSortKey=k; arbSortAsc=false; }
       } else if (tbl === 'tri') {
         if (triSortKey===k) { triSortAsc=!triSortAsc; } else { triSortKey=k; triSortAsc=false; }
+      } else if (tbl === 'met') {
+        if (metSortKey===k) { metSortAsc=!metSortAsc; } else { metSortKey=k; metSortAsc=false; }
       } else {
         if (sortKey===k) { sortAsc=!sortAsc; } else { sortKey=k; sortAsc=false; }
       }
@@ -1051,7 +1180,7 @@
       parentTable.querySelectorAll('th').forEach(h => h.classList.remove('sorted'));
       th.classList.add('sorted');
       const ar = th.querySelector('.sort-arrow');
-      const isAsc = tbl === 'arb' ? arbSortAsc : tbl === 'tri' ? triSortAsc : sortAsc;
+      const isAsc = tbl === 'arb' ? arbSortAsc : tbl === 'tri' ? triSortAsc : tbl === 'met' ? metSortAsc : sortAsc;
       if (ar) ar.textContent = isAsc?'\u25B2':'\u25BC';
       page = 0;
       activeRender();
