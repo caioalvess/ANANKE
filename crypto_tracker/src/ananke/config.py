@@ -49,29 +49,45 @@ class OkxConfig:
 
 @dataclass(frozen=True)
 class KrakenConfig:
-    """Kraken exchange connection settings (REST polling)."""
+    """Kraken exchange connection settings."""
 
     rest_url: str = "https://api.kraken.com"
+    ws_url: str = "wss://ws.kraken.com/v2"
     poll_interval_sec: float = 2.0
     rest_timeout_sec: int = 15
+    ws_ping_interval: int = 25
+    ws_ping_timeout: int = 10
+    ws_close_timeout: int = 5
+    ws_reconnect_delay: int = 3
+    ws_max_failures: int = 3
 
 
 @dataclass(frozen=True)
 class KucoinConfig:
-    """KuCoin exchange connection settings (REST polling)."""
+    """KuCoin exchange connection settings."""
 
     rest_url: str = "https://api.kucoin.com"
+    ws_bullet_url: str = "https://api.kucoin.com/api/v1/bullet-public"
     poll_interval_sec: float = 2.0
     rest_timeout_sec: int = 15
+    ws_close_timeout: int = 5
+    ws_reconnect_delay: int = 3
+    ws_max_failures: int = 3
 
 
 @dataclass(frozen=True)
 class GateioConfig:
-    """Gate.io exchange connection settings (REST polling)."""
+    """Gate.io exchange connection settings."""
 
     rest_url: str = "https://api.gateio.ws"
+    ws_url: str = "wss://api.gateio.ws/ws/v4/"
     poll_interval_sec: float = 2.0
     rest_timeout_sec: int = 15
+    ws_ping_interval: int = 25
+    ws_ping_timeout: int = 10
+    ws_close_timeout: int = 5
+    ws_reconnect_delay: int = 3
+    ws_max_failures: int = 3
 
 
 @dataclass(frozen=True)
@@ -183,16 +199,19 @@ def load_config() -> AppConfig:
         ),
         kraken=KrakenConfig(
             rest_url=_env("ANANKE_KRAKEN_REST_URL", krk_d.rest_url),
+            ws_url=_env("ANANKE_KRAKEN_WS_URL", krk_d.ws_url),
             poll_interval_sec=_env_float("ANANKE_KRAKEN_POLL_INTERVAL", krk_d.poll_interval_sec),
             rest_timeout_sec=_env_int("ANANKE_KRAKEN_REST_TIMEOUT", krk_d.rest_timeout_sec),
         ),
         kucoin=KucoinConfig(
             rest_url=_env("ANANKE_KUCOIN_REST_URL", kuc_d.rest_url),
+            ws_bullet_url=_env("ANANKE_KUCOIN_WS_BULLET_URL", kuc_d.ws_bullet_url),
             poll_interval_sec=_env_float("ANANKE_KUCOIN_POLL_INTERVAL", kuc_d.poll_interval_sec),
             rest_timeout_sec=_env_int("ANANKE_KUCOIN_REST_TIMEOUT", kuc_d.rest_timeout_sec),
         ),
         gateio=GateioConfig(
             rest_url=_env("ANANKE_GATEIO_REST_URL", gio_d.rest_url),
+            ws_url=_env("ANANKE_GATEIO_WS_URL", gio_d.ws_url),
             poll_interval_sec=_env_float("ANANKE_GATEIO_POLL_INTERVAL", gio_d.poll_interval_sec),
             rest_timeout_sec=_env_int("ANANKE_GATEIO_REST_TIMEOUT", gio_d.rest_timeout_sec),
         ),
