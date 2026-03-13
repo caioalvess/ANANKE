@@ -20,9 +20,9 @@ O ANANKE usa as seguintes taker fees (nivel basico, sem desconto por volume):
 | Bybit    | 0.10%     |
 | KuCoin   | 0.10%     |
 | Gate.io  | 0.20%     |
-| Kraken   | 0.40%     |
+| Kraken   | 0.26%     |
 
-Essas taxas estao definidas em `src/ananke/fee_registry.py` — `DEFAULT_TAKER_FEES`.
+Essas taxas estao definidas em `src/ananke/fee_registry.py` — `_DEFAULT_TAKER`.
 
 ## Como e calculado
 
@@ -32,19 +32,19 @@ Exemplo real:
 BTC ask na Kraken:  $60.000 (voce compra aqui)
 BTC bid na Binance: $60.600 (voce vende aqui)
 
-1. Custo real de compra (ask + taker fee da Kraken 0.4%):
-   $60.000 * 1.004 = $60.240
+1. Custo real de compra (ask + taker fee da Kraken 0.26%):
+   $60.000 * 1.0026 = $60.156
 
 2. Receita real de venda (bid - taker fee da Binance 0.1%):
    $60.600 * 0.999 = $60.539,40
 
 3. NET PROFIT %:
-   (60539.40 - 60240) / 60240 * 100 = 0.497%
+   (60539.40 - 60156) / 60156 * 100 = 0.638%
 
 Comparacao:
 - pf (bruto):   1.0%
-- npf (net):    0.497%
-- Perdido em fees: 0.503%
+- npf (net):    0.638%
+- Perdido em fees: 0.362%
 ```
 
 Formula:
@@ -54,7 +54,7 @@ sell_revenue = bid * (1 - taker_fee_bid_exchange)
 npf          = (sell_revenue - buy_cost) / buy_cost * 100
 ```
 
-Note que as fees sao assimetricas — se voce compra numa exchange cara (Kraken 0.4%) e vende numa barata (Binance 0.1%), o impacto total e diferente de comprar na barata e vender na cara. O npf leva isso em conta automaticamente.
+Note que as fees sao assimetricas — se voce compra numa exchange cara (Kraken 0.26%) e vende numa barata (Binance 0.1%), o impacto total e diferente de comprar na barata e vender na cara. O npf leva isso em conta automaticamente.
 
 ## Como ler
 
@@ -81,7 +81,7 @@ Se pf = 1.0% e npf = 0.5%, as taker fees estao custando 0.5 pontos percentuais.
 
 Isso te ajuda a decidir:
 
-- **Trocar de exchange**: se voce compra na Kraken (0.4%), talvez a mesma moeda na KuCoin (0.1%) tenha um ask proximo. Economia de 0.3% por lado.
+- **Trocar de exchange**: se voce compra na Kraken (0.26%), talvez a mesma moeda na KuCoin (0.1%) tenha um ask proximo. Economia de 0.16% por lado.
 - **Usar limit orders**: taker fees se aplicam a market orders. Limit orders pagam maker fees, que sao menores ou ate zero em algumas exchanges. O trade-off: voce perde velocidade de execucao.
 - **Negociar fee tier**: com volume alto, as exchanges reduzem taker fees. Se voce opera $100K/mes na Binance, a taker cai de 0.1% pra 0.08% ou menos.
 
@@ -90,8 +90,8 @@ Isso te ajuda a decidir:
 O npf revela quando uma exchange e significativamente mais cara que a outra. Se voce ve o mesmo par com npf muito diferente dependendo de qual lado e compra e qual e venda, a causa sao as fees assimetricas.
 
 Exemplo:
-- Comprar Kraken (0.4%) → Vender Binance (0.1%): custo total de fees ~0.5%
-- Comprar Binance (0.1%) → Vender Kraken (0.4%): custo total de fees ~0.5%
+- Comprar Kraken (0.26%) → Vender Binance (0.1%): custo total de fees ~0.36%
+- Comprar Binance (0.1%) → Vender Kraken (0.26%): custo total de fees ~0.36%
 
 Nesse caso e simetrico. Mas se uma exchange tem taker de 0.05% (fee tier alto) e outra tem 0.3%, a direcao do trade importa.
 
@@ -139,13 +139,13 @@ Se o npf ja e negativo, o tnpf so pode ser pior. Se o npf e positivo, o tnpf te 
 
 O npf nao entra diretamente no calculo do Quality Tier (que usa ex1k e mdq). Mas na pratica:
 
-- Tier A com npf negativo e contraditorio — se o ex1k e positivo, o npf deveria ser tambem na maioria dos casos (o ex1k ja inclui slippage que o npf nao ve)
+- Tier A com npf negativo e contraditorio — se o ex1k e positivo, o npf deveria ser tambem na maioria dos casos (o ex1k ja inclui tanto slippage quanto taker fees, e o slippage so piora o preco)
 - Tier B e C sao ordenados por tnpf, que depende diretamente do npf
 
 ## Onde fica no codigo
 
 - Calculo: `src/ananke/fee_registry.py` — `FeeRegistry.net_profit_after_taker()`, formula `(sell_revenue - buy_cost) / buy_cost * 100`
-- Taker fees: `src/ananke/fee_registry.py` — `DEFAULT_TAKER_FEES` dict
+- Taker fees: `src/ananke/fee_registry.py` — `_DEFAULT_TAKER` dict
 - Chamada: `src/ananke/web/server.py` — `_compute_arbitrage()`, linha 146
 - Frontend: coluna "NET PROFIT %" na tabela de arbitragem
 - Cor: amarelo se >= 0.5%, verde se > 0%, vermelho se < 0%

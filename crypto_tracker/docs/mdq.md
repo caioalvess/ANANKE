@@ -2,7 +2,7 @@
 
 ## O que e
 
-O mdq (middle dollar quantity) e quanto dinheiro real, em USD, existe no order book entre o melhor bid e o melhor ask. Mede a liquidez disponivel pra executar um trade sem mover o preco.
+O mdq (minimum depth quantity) e o minimo de liquidez total, em USD, entre os dois lados do order book (buy side e sell side). Pega a profundidade total de cada lado em todos os niveis e usa o menor — porque e o lado mais fraco que limita a execucao.
 
 ## Por que existe
 
@@ -47,14 +47,14 @@ Assim como o ex1k, o mdq e um snapshot do order book num momento especifico. Se 
 ## Como funciona por dentro
 
 1. O `OrderBookProbe` busca o order book via REST para os top-N pares com maior spread
-2. Para cada par, calcula o volume total em USD disponivel entre o melhor ask e o melhor bid
-3. Esse volume e o mdq — a "profundidade" real do mercado naquele momento
+2. Para cada lado (buy e sell), soma o volume total em USD de todos os niveis do book (`depth_available_quote`)
+3. mdq = `min(buy_side, sell_side)` — usa o lado mais fraco como medida de profundidade real
 
 ## Relacao com ex1k
 
 Os dois saem da mesma fonte (o order book) mas medem coisas diferentes:
 
-- **mdq** = `min(buy_side.depth_available_quote, sell_side.depth_available_quote)` — soma total de dolares no book inteiro (todos os niveis). Responde: "quanto volume o book aguenta?"
+- **mdq** = `min(buy_side.depth_available_quote, sell_side.depth_available_quote)` — minimo entre a profundidade total dos dois lados do book (todos os niveis). Responde: "quanto volume o lado mais fraco do book aguenta?"
 - **ex1k** = simulacao VWAP percorrendo nivel a nivel ate $1K, calculando lucro real com taker fees. Responde: "da lucro executando $1K?"
 
 ### Por que um nao substitui o outro

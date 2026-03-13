@@ -315,8 +315,8 @@
         <th data-key="s" data-table="arb">PAR</th>
         <th data-key="pf" data-table="arb">PROFIT %<span class="sort-arrow">&darr;</span></th>
         <th data-key="npf" data-table="arb">NET PROFIT %<span class="sort-arrow">&darr;</span></th>
-        <th data-key="tnpf" data-table="arb"">TRUE NET %<span class="sort-arrow">&darr;</span></th>
-        <th data-key="wf" data-table="arb"">TAXA ENVIO<span class="sort-arrow">&darr;</span></th>
+        <th data-key="tnpf" data-table="arb">TRUE NET %<span class="sort-arrow">&darr;</span></th>
+        <th data-key="wf" data-table="arb">TAXA ENVIO<span class="sort-arrow">&darr;</span></th>
         <th data-key="ak" data-table="arb">COMPRA (ASK)<span class="sort-arrow">&darr;</span></th>
         <th data-key="ax" data-table="arb">EXCHANGE COMPRA<span class="sort-arrow">&darr;</span></th>
         <th data-key="bi" data-table="arb">VENDA (BID)<span class="sort-arrow">&darr;</span></th>
@@ -804,7 +804,7 @@
         '<td class="pair-cell"><span class="pair-base">'+o.b+'</span><span class="pair-quote">/'+o.q+'</span></td>'+
         '<td class="'+pfClass+'">'+o.pf.toFixed(3)+'%</td>'+
         '<td class="'+npfClass+'">'+o.npf.toFixed(3)+'%</td>'+
-        '<td '+tnpfClass+'">'+o.tnpf.toFixed(3)+'%</td>'+
+        '<td class="'+tnpfClass+'">'+o.tnpf.toFixed(3)+'%</td>'+
         '<td>'+wfStr+'</td>'+
         '<td>'+fP(o.ak)+'</td>'+
         '<td class="ex-tag">'+exLink(o.ax,o.b,o.q)+'</td>'+

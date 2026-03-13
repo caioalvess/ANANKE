@@ -12,7 +12,7 @@ Um spread de 5% no papel pode virar prejuizo se o book tiver $200 de liquidez de
 
 ## Como ler
 
-- **ex1k = 0.5%** → executando $1K em cada lado, sobram 0.5% de lucro real depois do slippage
+- **ex1k = 0.5%** → executando $1K em cada lado, sobram 0.5% de lucro real depois do slippage e taker fees
 - **ex1k = 0.0%** → breakeven, o slippage come todo o spread
 - **ex1k = -0.2%** → o spread existe no papel mas da prejuizo quando voce tenta executar (book raso)
 - **ex1k = — (traco)** → sem dados de depth para esse par (fora do top-N monitorado pelo probe)
@@ -39,9 +39,10 @@ O ex1k e o filtro entre "parece bom" e "e bom de verdade". Sem ele, voce esta op
 
 1. O `OrderBookProbe` faz chamadas REST ao endpoint de order book das exchanges (top-N pares por spread)
 2. Para cada lado (compra e venda), percorre o book nivel a nivel, acumulando ate $1.000 de volume
-3. Calcula o preco medio ponderado real de execucao em cada lado
-4. ex1k = (preco_venda_real - preco_compra_real) / preco_compra_real * 100
-5. O resultado ja considera o impacto de mercado (slippage) mas NAO desconta taker fees — para isso existe o npf/tnpf
+3. Calcula o preco medio ponderado real de execucao em cada lado (VWAP)
+4. Aplica taker fees de cada exchange sobre o preco VWAP: `buy_cost = vwap_ask * (1 + taker_fee)`, `sell_rev = vwap_bid * (1 - taker_fee)`
+5. ex1k = (sell_rev - buy_cost) / buy_cost * 100
+6. O resultado ja considera tanto o impacto de mercado (slippage) quanto as taker fees das duas exchanges
 
 ## Relacao com AGE
 
@@ -59,7 +60,7 @@ O ex1k alimenta diretamente o Quality Tier (QT):
 
 ## Relacao com mdq (DEPTH)
 
-O mdq (middle dollar quantity) e a liquidez em USD no midpoint do spread. Ele complementa o ex1k:
+O mdq e o minimo de liquidez total em USD entre os dois lados do order book. Ele complementa o ex1k:
 
 - ex1k diz SE da lucro executando $1K
 - mdq diz QUANTA liquidez existe no book pra sustentar o trade

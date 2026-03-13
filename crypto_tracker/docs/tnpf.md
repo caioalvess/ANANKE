@@ -28,17 +28,17 @@ BTC bid na Binance: $60.600
    (60600 - 60000) / 60000 * 100 = 1.0%
 
 2. NET PROFIT % (npf)
-   Compra na Kraken: $60.000 * 1.004 (taker 0.4%) = $60.240 (custo real)
-   Venda na Binance: $60.600 * 0.999 (taker 0.1%) = $60.539 (receita real)
-   npf = (60539 - 60240) / 60240 * 100 = 0.496%
+   Compra na Kraken: $60.000 * 1.0026 (taker 0.26%) = $60.156 (custo real)
+   Venda na Binance: $60.600 * 0.999 (taker 0.1%) = $60.539,40 (receita real)
+   npf = (60539.40 - 60156) / 60156 * 100 = 0.638%
 
 3. TRUE NET % (tnpf)
    Withdrawal fee BTC na Kraken: 0.0001 BTC * $60.600 = $6.06
    Trade de referencia: $1.000
    Impacto: ($6.06 / $1.000) * 100 = 0.606%
-   tnpf = 0.496% - 0.606% = -0.11%
+   tnpf = 0.638% - 0.606% = +0.032%
 
-Resultado: spread de 1% virou prejuizo de 0.11% depois de tudo.
+Resultado: spread de 1% virou lucro marginal de 0.032% depois de tudo.
 ```
 
 Formula:
