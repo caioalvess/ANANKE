@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -320,11 +320,11 @@
         <th data-key="pf" data-table="arb">PROFIT %<span class="sort-arrow">&darr;</span></th>
         <th data-key="npf" data-table="arb">NET PROFIT %<span class="sort-arrow">&darr;</span></th>
         <th data-key="tnpf" data-table="arb">TRUE NET %<span class="sort-arrow">&darr;</span></th>
-        <th data-key="wf" data-table="arb">TAXA ENVIO<span class="sort-arrow">&darr;</span></th>
-        <th data-key="ak" data-table="arb">COMPRA (ASK)<span class="sort-arrow">&darr;</span></th>
-        <th data-key="ax" data-table="arb">EXCHANGE COMPRA<span class="sort-arrow">&darr;</span></th>
-        <th data-key="bi" data-table="arb">VENDA (BID)<span class="sort-arrow">&darr;</span></th>
-        <th data-key="bx" data-table="arb">EXCHANGE VENDA<span class="sort-arrow">&darr;</span></th>
+        <th data-key="wf" data-table="arb">WD FEE<span class="sort-arrow">&darr;</span></th>
+        <th data-key="ak" data-table="arb">BUY (ASK)<span class="sort-arrow">&darr;</span></th>
+        <th data-key="ax" data-table="arb">BUY EXCHANGE<span class="sort-arrow">&darr;</span></th>
+        <th data-key="bi" data-table="arb">SELL (BID)<span class="sort-arrow">&darr;</span></th>
+        <th data-key="bx" data-table="arb">SELL EXCHANGE<span class="sort-arrow">&darr;</span></th>
         <th data-key="msv" data-table="arb">MIN VOL<span class="sort-arrow">&darr;</span></th>
         <th data-key="ex1k" data-table="arb">EXEC $1K<span class="sort-arrow">&darr;</span></th>
         <th data-key="mdq" data-table="arb">DEPTH<span class="sort-arrow">&darr;</span></th>
@@ -498,7 +498,7 @@
 
   // --- Clock ---
   setInterval(() => {
-    $clock.textContent = new Date().toLocaleTimeString('pt-BR',{hour12:false});
+    $clock.textContent = new Date().toLocaleTimeString('en-US',{hour12:false});
   }, 1000);
 
   // --- Active sort/render based on view ---
