@@ -7,6 +7,7 @@ from ananke.models import Ticker
 from ananke.web.server import (
     _compute_arbitrage,
     _filter_arbitrage,
+    _rank_arbitrage,
 )
 
 
@@ -805,3 +806,200 @@ def test_no_fees_wf_zero_tnpf_equals_npf() -> None:
     assert len(result) == 1
     assert result[0]["wf"] == 0.0
     assert result[0]["tnpf"] == result[0]["npf"]
+
+
+# --- Transfer feasibility (tf) tests ---
+
+
+def _fee_registry_with_status(
+    withdraw_blocked: frozenset[tuple[str, str]] = frozenset(),
+    deposit_blocked: frozenset[tuple[str, str]] = frozenset(),
+    status_exchanges: frozenset[str] = frozenset(),
+) -> FeeRegistry:
+    return FeeRegistry(
+        taker={"Binance": 0.001, "Kraken": 0.004, "KuCoin": 0.001, "Gate.io": 0.002},
+        withdrawal={},
+        fallback_withdrawal={"BTC": 0.0005},
+        withdraw_blocked=withdraw_blocked,
+        deposit_blocked=deposit_blocked,
+        status_exchanges=status_exchanges,
+    )
+
+
+def test_transfer_status_both_confirmed_enabled() -> None:
+    """Both exchanges reported data, neither blocked → True."""
+    fees = _fee_registry_with_status(
+        status_exchanges=frozenset({"Binance", "KuCoin"}),
+    )
+    assert fees.transfer_status("Binance", "KuCoin", "BTC") is True
+
+
+def test_transfer_status_withdraw_blocked() -> None:
+    """Withdraw blocked on ask exchange → False."""
+    fees = _fee_registry_with_status(
+        withdraw_blocked=frozenset({("KuCoin", "BTC")}),
+        status_exchanges=frozenset({"Binance", "KuCoin"}),
+    )
+    assert fees.transfer_status("Binance", "KuCoin", "BTC") is False
+
+
+def test_transfer_status_deposit_blocked() -> None:
+    """Deposit blocked on bid exchange → False."""
+    fees = _fee_registry_with_status(
+        deposit_blocked=frozenset({("Binance", "BTC")}),
+        status_exchanges=frozenset({"Binance", "KuCoin"}),
+    )
+    assert fees.transfer_status("Binance", "KuCoin", "BTC") is False
+
+
+def test_transfer_status_no_data_for_ask() -> None:
+    """Ask exchange didn't report → None (unknown)."""
+    fees = _fee_registry_with_status(
+        status_exchanges=frozenset({"Binance"}),
+    )
+    # Bybit not in status_exchanges → can't confirm withdraw
+    assert fees.transfer_status("Binance", "Bybit", "BTC") is None
+
+
+def test_transfer_status_no_data_for_bid() -> None:
+    """Bid exchange didn't report → None."""
+    fees = _fee_registry_with_status(
+        status_exchanges=frozenset({"KuCoin"}),
+    )
+    assert fees.transfer_status("OKX", "KuCoin", "BTC") is None
+
+
+def test_transfer_status_partial_data_with_block() -> None:
+    """One side has data and shows block → False even if other side unknown."""
+    fees = _fee_registry_with_status(
+        withdraw_blocked=frozenset({("KuCoin", "VRA")}),
+        status_exchanges=frozenset({"KuCoin"}),
+    )
+    # KuCoin reports withdraw blocked, Binance has no data
+    assert fees.transfer_status("Binance", "KuCoin", "VRA") is False
+
+
+def test_transfer_status_no_status_exchanges() -> None:
+    """No exchanges reported → always None."""
+    fees = _fee_registry_with_status()
+    assert fees.transfer_status("Binance", "KuCoin", "BTC") is None
+
+
+def test_tf_field_present_in_arb_results() -> None:
+    """Arb results include tf field when fees are provided."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0),
+    ]
+    fees = _fee_registry_with_status(
+        status_exchanges=frozenset({"Binance", "Kraken"}),
+    )
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
+    assert result[0]["tf"] is True
+
+
+def test_tf_blocked_still_shown() -> None:
+    """Blocked transfer still shows in results — never filtered out."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "KuCoin", bid=98.0, ask=99.0),
+    ]
+    fees = _fee_registry_with_status(
+        withdraw_blocked=frozenset({("KuCoin", "BTC")}),
+        status_exchanges=frozenset({"Binance", "KuCoin"}),
+    )
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
+    assert result[0]["tf"] is False
+
+
+def test_tf_none_without_fees() -> None:
+    """Without fee registry, tf is None."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "Kraken", bid=98.0, ask=99.0),
+    ]
+    result = _compute_arbitrage(tickers)
+    assert len(result) == 1
+    assert result[0]["tf"] is None
+
+
+def test_tf_none_when_exchange_has_no_status() -> None:
+    """Exchange without status data → tf is None."""
+    tickers = [
+        _make_ticker("BTCUSDT", "Binance", bid=100.0, ask=100.5),
+        _make_ticker("BTCUSDT", "Bybit", bid=98.0, ask=99.0),
+    ]
+    fees = _fee_registry_with_status(
+        status_exchanges=frozenset({"KuCoin"}),  # neither Binance nor Bybit
+    )
+    result = _compute_arbitrage(tickers, fees=fees)
+    assert len(result) == 1
+    assert result[0]["tf"] is None
+
+
+# --- Ranking with transfer feasibility ---
+
+
+def test_rank_tf_true_before_tf_none_same_tier() -> None:
+    """Within same qt tier, tf=True ranks above tf=None."""
+    results = [
+        {"pf": 1.0, "npf": 0.8, "tnpf": 0.7, "age": 5000, "tf": None},
+        {"pf": 1.0, "npf": 0.8, "tnpf": 0.7, "age": 5000, "tf": True},
+    ]
+    _rank_arbitrage(results)
+    # Both qt=2 (no depth data), same profit → tf=True first
+    assert results[0]["tf"] is True
+    assert results[1]["tf"] is None
+
+
+def test_rank_tf_none_before_tf_false_same_tier() -> None:
+    """Within same qt tier, tf=None ranks above tf=False."""
+    results = [
+        {"pf": 1.0, "npf": 0.8, "tnpf": 0.7, "age": 5000, "tf": False},
+        {"pf": 1.0, "npf": 0.8, "tnpf": 0.7, "age": 5000, "tf": None},
+    ]
+    _rank_arbitrage(results)
+    assert results[0]["tf"] is None
+    assert results[1]["tf"] is False
+
+
+def test_rank_tf_false_not_excluded() -> None:
+    """tf=False is ranked lower but NEVER excluded."""
+    results = [
+        {"pf": 5.0, "npf": 4.5, "tnpf": 4.0, "age": 5000, "tf": False},
+        {"pf": 1.0, "npf": 0.8, "tnpf": 0.7, "age": 5000, "tf": True},
+    ]
+    _rank_arbitrage(results)
+    assert len(results) == 2
+    # tf=True first despite lower profit (same tier, tf wins)
+    assert results[0]["tf"] is True
+    assert results[1]["tf"] is False
+
+
+def test_rank_qt_still_primary_over_tf() -> None:
+    """Quality tier is still the primary sort — tf is secondary."""
+    results = [
+        # qt=2 (no depth), tf=True
+        {"pf": 1.0, "npf": 0.8, "tnpf": 0.7, "age": 5000, "tf": True},
+        # qt=1 (depth verified), tf=False
+        {"pf": 0.5, "npf": 0.3, "tnpf": 0.2, "age": 5000, "tf": False,
+         "ex1k": 5.0, "mdq": 800},
+    ]
+    _rank_arbitrage(results, ref_trade_size=1000.0)
+    # qt=1 still comes before qt=2 regardless of tf
+    assert results[0]["qt"] == 1
+    assert results[1]["qt"] == 2
+
+
+def test_rank_stale_overrides_tf() -> None:
+    """Stale (>30s) → qt=3 regardless of tf=True."""
+    results = [
+        {"pf": 5.0, "npf": 4.5, "tnpf": 4.0, "age": 35_000, "tf": True},
+        {"pf": 1.0, "npf": 0.8, "tnpf": 0.7, "age": 5000, "tf": None},
+    ]
+    _rank_arbitrage(results)
+    # Stale gets qt=3, fresh gets qt=2 → fresh first
+    assert results[0]["qt"] == 2
+    assert results[1]["qt"] == 3

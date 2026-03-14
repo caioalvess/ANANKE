@@ -70,12 +70,14 @@ class FeeRegistry:
         withdraw_blocked: frozenset[tuple[str, str]] = frozenset(),
         deposit_blocked: frozenset[tuple[str, str]] = frozenset(),
         fallback_withdrawal: dict[str, float] | None = None,
+        status_exchanges: frozenset[str] = frozenset(),
     ) -> None:
         self._taker = taker               # exchange -> fee rate
         self._withdrawal = withdrawal     # (exchange, SYMBOL) -> fee in base asset
         self._fallback = fallback_withdrawal or {}  # SYMBOL -> fee (KuCoin/wfees)
         self._withdraw_blocked = withdraw_blocked  # (exchange, SYMBOL)
         self._deposit_blocked = deposit_blocked    # (exchange, SYMBOL)
+        self._status_exchanges = status_exchanges  # exchanges that reported status
 
     def taker_fee(self, exchange: str) -> float:
         """Taker fee rate for an exchange (e.g. 0.001 for 0.1%)."""
@@ -139,6 +141,45 @@ class FeeRegistry:
             return False
         return (bid_exchange, upper) not in self._deposit_blocked
 
+    def transfer_status(
+        self,
+        bid_exchange: str,
+        ask_exchange: str,
+        symbol: str,
+    ) -> bool | None:
+        """Transfer feasibility for an arbitrage opportunity.
+
+        Arb requires: withdraw from ask_exchange, deposit to bid_exchange.
+
+        Returns:
+            True  — both sides confirmed enabled (data exists, not blocked)
+            False — at least one side confirmed blocked
+            None  — insufficient data (one or both exchanges didn't report)
+        """
+        upper = symbol.upper()
+
+        ask_has_data = ask_exchange in self._status_exchanges
+        bid_has_data = bid_exchange in self._status_exchanges
+
+        if not ask_has_data or not bid_has_data:
+            # Can't confirm — check if the side WITH data shows a block
+            if ask_has_data and (ask_exchange, upper) in self._withdraw_blocked:
+                return False
+            if bid_has_data and (bid_exchange, upper) in self._deposit_blocked:
+                return False
+            return None
+
+        # Both sides have data
+        if (ask_exchange, upper) in self._withdraw_blocked:
+            return False
+        if (bid_exchange, upper) in self._deposit_blocked:
+            return False
+        return True
+
+    @property
+    def status_exchanges(self) -> frozenset[str]:
+        return self._status_exchanges
+
     @property
     def withdrawal_count(self) -> int:
         return len(self._withdrawal) + len(self._fallback)
@@ -185,6 +226,7 @@ def _load_cache() -> FeeRegistry | None:
             withdraw_blocked=wb,
             deposit_blocked=db,
             fallback_withdrawal=data.get("fallback_withdrawal", {}),
+            status_exchanges=frozenset(data.get("status_exchanges", [])),
         )
         logger.info(
             "Loaded fee registry from cache: %d withdrawal fees, "
@@ -212,6 +254,7 @@ def _save_cache(registry: FeeRegistry) -> None:
             "fallback_withdrawal": registry._fallback,
             "withdraw_blocked": [list(p) for p in registry._withdraw_blocked],
             "deposit_blocked": [list(p) for p in registry._deposit_blocked],
+            "status_exchanges": sorted(registry._status_exchanges),
         }))
     except Exception:
         logger.debug("Could not write fee registry cache", exc_info=True)
@@ -234,13 +277,14 @@ def _safe_float(val: object) -> float:
 
 class _CurrencyData:
     """Parsed currency data from an exchange (fees + transfer status)."""
-    __slots__ = ("exchange", "fees", "withdraw_blocked", "deposit_blocked")
+    __slots__ = ("exchange", "fees", "withdraw_blocked", "deposit_blocked", "success")
 
     def __init__(self, exchange: str) -> None:
         self.exchange = exchange
         self.fees: dict[str, float] = {}
         self.withdraw_blocked: set[tuple[str, str]] = set()
         self.deposit_blocked: set[tuple[str, str]] = set()
+        self.success = False
 
 
 async def _fetch_kucoin_currency_data(
@@ -313,6 +357,7 @@ async def _fetch_kucoin_currency_data(
                 if fee > 0:
                     result.fees[sym] = fee
 
+        result.success = True
         logger.info(
             "KuCoin: %d withdrawal fees, %d withdraw-blocked, %d deposit-blocked",
             len(result.fees),
@@ -551,44 +596,44 @@ async def _fetch_wfees_exchanges(
 _GATEIO_CURRENCIES = "https://api.gateio.ws/api/v4/spot/currencies"
 
 
-async def _fetch_gateio_transfer_status(
+async def _fetch_gateio_currency_data(
     session: aiohttp.ClientSession,
-) -> tuple[set[tuple[str, str]], set[tuple[str, str]]]:
+) -> _CurrencyData:
     """Fetch deposit/withdrawal status from Gate.io /api/v4/spot/currencies.
 
-    Returns (withdraw_blocked, deposit_blocked) as sets of (exchange, SYMBOL).
+    Returns _CurrencyData with withdraw/deposit blocked sets.
     Gate.io fields: withdraw_disabled (bool), deposit_disabled (bool).
     """
-    exchange = "Gate.io"
-    withdraw_blocked: set[tuple[str, str]] = set()
-    deposit_blocked: set[tuple[str, str]] = set()
+    result = _CurrencyData("Gate.io")
+    exchange = result.exchange
 
     try:
         req_timeout = aiohttp.ClientTimeout(total=60)
         async with session.get(_GATEIO_CURRENCIES, timeout=req_timeout) as resp:
             if resp.status != 200:
                 logger.warning("Gate.io /currencies returned %d", resp.status)
-                return withdraw_blocked, deposit_blocked
+                return result
             data = await resp.json()
     except Exception:
         logger.warning("Gate.io /currencies unreachable", exc_info=True)
-        return withdraw_blocked, deposit_blocked
+        return result
 
     for c in data:
         sym = c.get("currency", "").upper()
         if not sym:
             continue
         if c.get("withdraw_disabled"):
-            withdraw_blocked.add((exchange, sym))
+            result.withdraw_blocked.add((exchange, sym))
         if c.get("deposit_disabled"):
-            deposit_blocked.add((exchange, sym))
+            result.deposit_blocked.add((exchange, sym))
 
+    result.success = True
     logger.info(
         "Gate.io: %d withdraw-blocked, %d deposit-blocked",
-        len(withdraw_blocked),
-        len(deposit_blocked),
+        len(result.withdraw_blocked),
+        len(result.deposit_blocked),
     )
-    return withdraw_blocked, deposit_blocked
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -607,31 +652,30 @@ _KRAKEN_DP_BLOCKED = {"withdrawal_only", "disabled"}
 _KRAKEN_REMAP = {"XBT": "BTC"}
 
 
-async def _fetch_kraken_transfer_status(
+async def _fetch_kraken_currency_data(
     session: aiohttp.ClientSession,
-) -> tuple[set[tuple[str, str]], set[tuple[str, str]]]:
+) -> _CurrencyData:
     """Fetch deposit/withdrawal status from Kraken /0/public/Assets.
 
-    Returns (withdraw_blocked, deposit_blocked) as sets of (exchange, SYMBOL).
+    Returns _CurrencyData with withdraw/deposit blocked sets.
     Kraken uses altname as the ticker symbol (e.g. XBT → BTC via _ASSET_REMAP).
     """
-    exchange = "Kraken"
-    withdraw_blocked: set[tuple[str, str]] = set()
-    deposit_blocked: set[tuple[str, str]] = set()
+    result = _CurrencyData("Kraken")
+    exchange = result.exchange
 
     try:
         async with session.get(_KRAKEN_ASSETS) as resp:
             if resp.status != 200:
                 logger.warning("Kraken /Assets returned %d", resp.status)
-                return withdraw_blocked, deposit_blocked
+                return result
             data = await resp.json()
     except Exception:
         logger.warning("Kraken /Assets unreachable", exc_info=True)
-        return withdraw_blocked, deposit_blocked
+        return result
 
     if data.get("error"):
         logger.warning("Kraken /Assets error: %s", data["error"])
-        return withdraw_blocked, deposit_blocked
+        return result
 
     for asset_data in data.get("result", {}).values():
         sym = asset_data.get("altname", "").upper()
@@ -640,21 +684,22 @@ async def _fetch_kraken_transfer_status(
         sym = _KRAKEN_REMAP.get(sym, sym)
         status = asset_data.get("status", "enabled")
         if status in _KRAKEN_WD_BLOCKED:
-            withdraw_blocked.add((exchange, sym))
+            result.withdraw_blocked.add((exchange, sym))
         if status in _KRAKEN_DP_BLOCKED:
-            deposit_blocked.add((exchange, sym))
+            result.deposit_blocked.add((exchange, sym))
 
-    blocked_total = len(withdraw_blocked) + len(deposit_blocked)
+    result.success = True
+    blocked_total = len(result.withdraw_blocked) + len(result.deposit_blocked)
     if blocked_total:
         logger.info(
             "Kraken: %d withdraw-blocked, %d deposit-blocked",
-            len(withdraw_blocked),
-            len(deposit_blocked),
+            len(result.withdraw_blocked),
+            len(result.deposit_blocked),
         )
     else:
         logger.info("Kraken: all %d assets enabled", len(data.get("result", {})))
 
-    return withdraw_blocked, deposit_blocked
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -740,6 +785,7 @@ async def _fetch_okx_currency_data(
         if not any_deposit:
             result.deposit_blocked.add((exchange, sym))
 
+    result.success = True
     logger.info(
         "OKX: %d withdrawal fees, %d withdraw-blocked, %d deposit-blocked",
         len(result.fees),
@@ -824,6 +870,7 @@ async def _fetch_binance_public_currency_data(
         if not any_deposit:
             result.deposit_blocked.add((exchange, sym))
 
+    result.success = True
     logger.info(
         "Binance (public): %d withdrawal fees, "
         "%d withdraw-blocked, %d deposit-blocked",
@@ -903,6 +950,7 @@ async def _fetch_binance_currency_data(
         if not any_deposit:
             result.deposit_blocked.add((exchange, sym))
 
+    result.success = True
     logger.info(
         "Binance: %d withdrawal fees, %d withdraw-blocked, %d deposit-blocked",
         len(result.fees),
@@ -1002,6 +1050,7 @@ async def _fetch_bybit_currency_data(
         if not any_deposit:
             result.deposit_blocked.add((exchange, sym))
 
+    result.success = True
     logger.info(
         "Bybit: %d withdrawal fees, %d withdraw-blocked, %d deposit-blocked",
         len(result.fees),
@@ -1053,16 +1102,16 @@ async def build_fee_registry() -> FeeRegistry:
             # All exchange currency data fetchers concurrently
             (
                 kucoin_data,
-                (gateio_wb, gateio_db),
-                (kraken_wb, kraken_db),
+                gateio_data,
+                kraken_data,
                 okx_data,
                 binance_auth_data,
                 binance_pub_data,
                 bybit_data,
             ) = await asyncio.gather(
                 _fetch_kucoin_currency_data(session),
-                _fetch_gateio_transfer_status(session),
-                _fetch_kraken_transfer_status(session),
+                _fetch_gateio_currency_data(session),
+                _fetch_kraken_currency_data(session),
                 _fetch_okx_currency_data(session),
                 _fetch_binance_currency_data(session),
                 _fetch_binance_public_currency_data(session),
@@ -1071,6 +1120,9 @@ async def build_fee_registry() -> FeeRegistry:
 
             # Merge Binance: auth wins when available, public fills gaps
             binance_data = _CurrencyData("Binance")
+            binance_data.success = (
+                binance_pub_data.success or binance_auth_data.success
+            )
             for sym, fee in binance_pub_data.fees.items():
                 binance_data.fees[sym] = fee
             binance_data.withdraw_blocked.update(binance_pub_data.withdraw_blocked)
@@ -1085,23 +1137,27 @@ async def build_fee_registry() -> FeeRegistry:
                 binance_auth_data.deposit_blocked or binance_data.deposit_blocked
             )
 
-            # Collect per-exchange withdrawal fees
-            for cd in (kucoin_data, okx_data, binance_data, bybit_data):
+            # Collect per-exchange withdrawal fees and transfer status
+            all_currency_data = [
+                kucoin_data, okx_data, binance_data, bybit_data,
+                gateio_data, kraken_data,
+            ]
+            for cd in all_currency_data:
                 for sym, fee in cd.fees.items():
                     withdrawal[(cd.exchange, sym)] = fee
                 all_withdraw_blocked.update(cd.withdraw_blocked)
                 all_deposit_blocked.update(cd.deposit_blocked)
 
-            # Gate.io + Kraken return (blocked, blocked) tuples
-            all_withdraw_blocked.update(gateio_wb)
-            all_deposit_blocked.update(gateio_db)
-            all_withdraw_blocked.update(kraken_wb)
-            all_deposit_blocked.update(kraken_db)
-
             # Fallback fees: merge all exchange fees → generic fallback
-            # Priority: KuCoin > OKX > Binance > Bybit
+            # Priority: KuCoin > OKX > Binance > Bybit (later overwrites earlier)
             for cd in (bybit_data, binance_data, okx_data, kucoin_data):
                 fallback_withdrawal.update(cd.fees)
+
+            # Track which exchanges successfully reported transfer status
+            status_exchanges: set[str] = set()
+            for cd in all_currency_data:
+                if cd.success:
+                    status_exchanges.add(cd.exchange)
 
             # withdrawalfees.com per-exchange: covers Bybit, Gate.io, Kraken
             # Only add if we don't already have exchange-specific data
@@ -1129,6 +1185,7 @@ async def build_fee_registry() -> FeeRegistry:
             for label, cd in [
                 ("KuCoin", kucoin_data), ("OKX", okx_data),
                 ("Binance", binance_data), ("Bybit", bybit_data),
+                ("Gate.io", gateio_data), ("Kraken", kraken_data),
             ]:
                 if cd.fees:
                     sources.append(f"{len(cd.fees)} from {label}")
@@ -1153,14 +1210,17 @@ async def build_fee_registry() -> FeeRegistry:
         frozenset(all_withdraw_blocked),
         frozenset(all_deposit_blocked),
         fallback_withdrawal,
+        frozenset(status_exchanges),
     )
     logger.info(
         "Built fee registry: %d withdrawal fees, %d withdraw-blocked, "
-        "%d deposit-blocked, %d exchange taker rates",
+        "%d deposit-blocked, %d exchange taker rates, "
+        "transfer status from %s",
         registry.withdrawal_count,
         len(all_withdraw_blocked),
         len(all_deposit_blocked),
         len(_DEFAULT_TAKER),
+        sorted(status_exchanges) or "none",
     )
     _save_cache(registry)
     return registry

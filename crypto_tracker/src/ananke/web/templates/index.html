@@ -229,6 +229,9 @@
   .qt-a { color: var(--green); font-weight: 700; text-align: center; }
   .qt-b { color: var(--yellow); text-align: center; }
   .qt-c { color: var(--red); text-align: center; }
+  .tf-ok { color: var(--green); font-weight: 700; text-align: center; }
+  .tf-no { color: var(--red); font-weight: 700; text-align: center; }
+  .tf-na { color: #333; text-align: center; }
 
   .table-empty {
     text-align: center; padding: 40px 16px; color: var(--green-dark);
@@ -312,6 +315,7 @@
       <tr>
         <th data-key="idx" data-table="arb" style="width:40px;">#</th>
         <th data-key="qt" data-table="arb" class="sorted" style="width:32px;">QT<span class="sort-arrow">&uarr;</span></th>
+        <th data-key="tf" data-table="arb" style="width:32px;">TF<span class="sort-arrow">&darr;</span></th>
         <th data-key="s" data-table="arb">PAR</th>
         <th data-key="pf" data-table="arb">PROFIT %<span class="sort-arrow">&darr;</span></th>
         <th data-key="npf" data-table="arb">NET PROFIT %<span class="sort-arrow">&darr;</span></th>
@@ -726,15 +730,26 @@
       data = data.filter(o => o.s.includes(s) || o.b.includes(s));
     }
 
+    // Transfer feasibility sort order: true=0 (best), null=1, false=2
+    function tfOrd(v) { return v===true?0:v===false?2:1; }
+
     data.sort((a,b) => {
       if (arbSortKey === 'qt') {
-        // Quality tier: sort by tier first, then by best profit within tier
+        // Quality tier: sort by tier first, then tf, then profit
         const qa = a.qt||2, qb = b.qt||2;
         if (qa !== qb) return arbSortAsc ? (qa-qb) : (qb-qa);
-        // Within same tier: tier 1 by ex1k desc, others by profit desc
+        // Within same tier: transfer feasibility second
+        const ta = tfOrd(a.tf), tb = tfOrd(b.tf);
+        if (ta !== tb) return ta - tb;
+        // Then profit: tier 1 by ex1k desc, others by tnpf desc
         if (qa === 1) return (b.ex1k||0) - (a.ex1k||0);
         const pk = 'tnpf';
         return (b[pk]||0) - (a[pk]||0);
+      }
+      if (arbSortKey === 'tf') {
+        const ta = tfOrd(a.tf), tb = tfOrd(b.tf);
+        if (ta !== tb) return arbSortAsc ? (ta-tb) : (tb-ta);
+        return (b.tnpf||0) - (a.tnpf||0);
       }
       let va=a[arbSortKey], vb=b[arbSortKey];
       if (typeof va==='string') return arbSortAsc?va.localeCompare(vb):vb.localeCompare(va);
@@ -797,10 +812,14 @@
       const qt = o.qt||2;
       const qtLabel = qt===1?'A':qt===2?'B':'C';
       const qtClass = qt===1?'qt-a':qt===3?'qt-c':'qt-b';
+      const tf = o.tf;
+      const tfLabel = tf===true?'\u2713':tf===false?'\u2717':'\u2014';
+      const tfClass = tf===true?'tf-ok':tf===false?'tf-no':'tf-na';
       buf[i] =
         '<tr class="'+fc+staleRowClass+'">'+
         '<td>'+gi+'</td>'+
         '<td class="'+qtClass+'">'+qtLabel+'</td>'+
+        '<td class="'+tfClass+'">'+tfLabel+'</td>'+
         '<td class="pair-cell"><span class="pair-base">'+o.b+'</span><span class="pair-quote">/'+o.q+'</span></td>'+
         '<td class="'+pfClass+'">'+o.pf.toFixed(3)+'%</td>'+
         '<td class="'+npfClass+'">'+o.npf.toFixed(3)+'%</td>'+
@@ -819,7 +838,7 @@
         '</tr>';
     }
     if (pageData.length === 0) {
-      $arbTbody.innerHTML = emptyRow(17, 'arbitrage');
+      $arbTbody.innerHTML = emptyRow(18, 'arbitrage');
     } else {
       $arbTbody.innerHTML = buf.join('');
     }

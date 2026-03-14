@@ -167,6 +167,15 @@ def _compute_arbitrage(
         age = max(now_ms - bts, now_ms - ats)
         msv = min(entry["max_bid_vol"], entry["min_ask_vol"])
 
+        # Transfer feasibility: True=confirmed, False=blocked, None=unknown
+        tf = None
+        if fees:
+            tf = fees.transfer_status(
+                bid_exchange=entry["max_bid_ex"],
+                ask_exchange=entry["min_ask_ex"],
+                symbol=entry["base"],
+            )
+
         results.append({
             "s": entry["symbol"],
             "b": entry["base"],
@@ -179,6 +188,7 @@ def _compute_arbitrage(
             "npf": round(net_pf, 4),
             "tnpf": round(tnpf, 4),
             "wf": wf,
+            "tf": tf,
             "msv": msv,
             "bv": entry["max_bid_vol"],
             "av": entry["min_ask_vol"],
@@ -236,13 +246,17 @@ def _rank_arbitrage(
         else:
             r["qt"] = 2
 
-    def _sort_key(r: dict) -> tuple[int, float]:
+    # Transfer feasibility sort order: True=0 (best), None=1, False=2
+    _TF_ORDER = {True: 0, None: 1, False: 2}
+
+    def _sort_key(r: dict) -> tuple[int, int, float]:
         qt = r.get("qt", 2)
+        tf_ord = _TF_ORDER.get(r.get("tf"), 1)
         if qt == 1:
-            return (0, -(r.get("ex1k") or 0))
+            return (0, tf_ord, -(r.get("ex1k") or 0))
         if qt == 3:
-            return (2, -(r.get(profit_key) or r.get("pf") or 0))
-        return (1, -(r.get(profit_key) or r.get("pf") or 0))
+            return (2, tf_ord, -(r.get(profit_key) or r.get("pf") or 0))
+        return (1, tf_ord, -(r.get(profit_key) or r.get("pf") or 0))
 
     results.sort(key=_sort_key)
 
