@@ -30,6 +30,7 @@ from ananke.triangular import compute_triangular_all
 logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 @dataclass
@@ -588,6 +589,7 @@ async def start_web(
     app.router.add_get("/", _index_handler)
     app.router.add_get("/ws", _ws_handler)
     app.router.add_get("/api/metrics", _metrics_handler)
+    app.router.add_static("/static", STATIC_DIR)
 
     runner = web.AppRunner(app)
     await runner.setup()
