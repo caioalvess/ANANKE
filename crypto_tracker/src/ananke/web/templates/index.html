@@ -88,6 +88,7 @@
   }
 
   .controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ctrl-group { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
   .ctrl-label { color: var(--cyan); font-size: 10px; letter-spacing: 1px; margin-right: 2px; }
 
   .filter-btn {
@@ -260,40 +261,48 @@
     </div>
   </div>
   <div class="controls">
-    <span class="ctrl-label">VIEW:</span>
-    <button class="filter-btn view-btn active" data-view="arbitrage">ARBITRAGE</button>
-    <button class="filter-btn view-btn" data-view="triangular">TRIANGULAR</button>
-    <button class="filter-btn view-btn" data-view="metrics">METRICS</button>
-
-    <span class="sep exchange-filter">|</span>
-    <span class="ctrl-label exchange-filter">EXCHANGE:</span>
-    <div id="exchangeBtns" class="exchange-filter" style="display:inline-flex;gap:4px;"></div>
-
-    <span class="sep quote-filter">|</span>
-    <span class="ctrl-label quote-filter">QUOTE:</span>
-    <div id="quoteBtns" class="quote-filter" style="display:inline-flex;gap:4px;">
-      <button class="filter-btn quote-btn active" data-q="USDT">USDT</button>
-      <button class="filter-btn quote-btn" data-q="BTC">BTC</button>
-      <button class="filter-btn quote-btn" data-q="ETH">ETH</button>
-      <button class="filter-btn quote-btn" data-q="USDC">USDC</button>
-      <button class="filter-btn quote-btn" data-q="ALL">ALL</button>
+    <div class="ctrl-group">
+      <span class="ctrl-label">VIEW:</span>
+      <button class="filter-btn view-btn active" data-view="arbitrage">ARBITRAGE</button>
+      <button class="filter-btn view-btn" data-view="triangular">TRIANGULAR</button>
+      <button class="filter-btn view-btn" data-view="metrics">METRICS</button>
     </div>
 
-    <span class="sep">|</span>
-    <input type="text" class="search-box" id="search" placeholder="> search...">
+    <div class="ctrl-group exchange-filter">
+      <span class="sep">|</span>
+      <span class="ctrl-label">EXCHANGE:</span>
+      <div id="exchangeBtns" style="display:inline-flex;gap:4px;"></div>
+    </div>
 
-    <span class="sep arb-filter" style="display:none;">|</span>
-    <span class="ctrl-label arb-filter" style="display:none;">MIN VOL $</span>
-    <input type="number" class="num-input arb-filter" id="arbMinVol" value="10000" min="0" step="1000" style="display:none;">
+    <div class="ctrl-group quote-filter">
+      <span class="sep">|</span>
+      <span class="ctrl-label">QUOTE:</span>
+      <div id="quoteBtns" style="display:inline-flex;gap:4px;">
+        <button class="filter-btn quote-btn active" data-q="USDT">USDT</button>
+        <button class="filter-btn quote-btn" data-q="BTC">BTC</button>
+        <button class="filter-btn quote-btn" data-q="ETH">ETH</button>
+        <button class="filter-btn quote-btn" data-q="USDC">USDC</button>
+        <button class="filter-btn quote-btn" data-q="ALL">ALL</button>
+      </div>
+    </div>
 
-    <span class="sep arb-filter" style="display:none;">|</span>
-    <span class="ctrl-label arb-filter" style="display:none;">MIN PROFIT %</span>
-    <input type="number" class="num-input arb-filter" id="arbMinProfit" value="0" min="0" step="0.1" style="display:none; width:55px;">
+    <div class="ctrl-group">
+      <span class="sep">|</span>
+      <input type="text" class="search-box" id="search" placeholder="> search...">
+    </div>
 
-    <span class="sep arb-filter" style="display:none;">|</span>
-
+  </div>
+  <div class="controls" id="secondRow" style="margin-top:4px;">
+    <div class="ctrl-group arb-filter" id="arbFilterGroup1">
+      <span class="ctrl-label">MIN VOL $</span>
+      <input type="number" class="num-input" id="arbMinVol" value="10000" min="0" step="1000">
+    </div>
+    <div class="ctrl-group arb-filter" id="arbFilterGroup2">
+      <span class="ctrl-label">MIN PROFIT %</span>
+      <input type="number" class="num-input" id="arbMinProfit" value="0" min="0" step="0.1" style="width:55px;">
+    </div>
     <div class="stats">
-      <div id="statsLabel">PAIRS:</div>
+      <div id="statsLabel">OPPS:</div>
       <div><span id="pairCount">0</span></div>
       <div>
         <button class="pager-btn" id="prevPage">&lt;</button>
@@ -436,7 +445,7 @@
   const $nextPage = $('nextPage');
   const $arbMinVol = $('arbMinVol');
   const $arbMinProfit = $('arbMinProfit');
-  const $arbFilters = document.querySelectorAll('.arb-filter');
+  const $arbFilterGroups = [$('arbFilterGroup1'), $('arbFilterGroup2')];
 
   // --- Formatters ---
   function fP(v) {
@@ -620,7 +629,7 @@
       $metricsView.style.display = '';
       $statsLabel.textContent = 'PAIRS:';
     }
-    $arbFilters.forEach(el => { el.style.display = isArb ? '' : 'none'; });
+    $arbFilterGroups.forEach(el => { el.style.display = isArb ? '' : 'none'; });
     // Hide quote filter for triangular & metrics
     document.querySelectorAll('.quote-filter').forEach(el => {
       el.style.display = (isTri || isMet) ? 'none' : '';

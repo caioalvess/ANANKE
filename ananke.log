@@ -4904,3 +4904,306 @@ Traceback (most recent call last):
   File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 703, in read
     await self._waiter
 asyncio.exceptions.CancelledError
+2026-03-14 16:27:51,433 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa5b067ad50>
+2026-03-14 16:27:51,433 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa5b067b6d0>
+2026-03-14 16:27:51,434 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa5b06902d0>
+2026-03-14 16:27:51,434 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa5b0690e90>
+2026-03-14 16:27:51,434 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa5b066ea50>, 238357.393180527)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fa5b067b750>
+2026-03-14 16:27:51,434 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa5b066e580>, 238357.099982932)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fa5b0690310>
+2026-03-14 16:27:51,434 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa5b066e660>, 238357.995174074)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fa5b0690ed0>
+2026-03-14 16:27:51,434 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa5b0692650>
+2026-03-14 16:27:51,434 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa5b06919d0>
+2026-03-14 16:27:51,434 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa5b066e970>, 238354.511893677), (<aiohttp.client_proto.ResponseHandler object at 0x7fa58e269e80>, 238357.076415113)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fa5b0691a50>
+2026-03-14 16:27:51,434 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-26' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:27:51,434 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-27' coro=<BybitExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/bybit.py:109> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:27:51,435 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-29' coro=<OkxExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/okx.py:98> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:27:51,435 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-31' coro=<KrakenExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py:153> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:27:51,435 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-33' coro=<KucoinExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kucoin.py:143> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:27:51,435 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-35' coro=<GateioExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/gateio.py:103> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:27:51,435 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa5ac998b90>
+2026-03-14 16:27:51,436 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fec10>, 238348.511551504), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1feeb0>, 238352.183455337), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fecf0>, 238352.18493572), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fd860>, 238355.925625642), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1ff230>, 238355.942452499)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1feb30>, 238356.134035346), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fe970>, 238356.184412378), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1ff150>, 238357.969577376), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fda20>, 238357.970106149), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fedd0>, 238358.021742627)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fe5f0>, 238355.900190199), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fe7b0>, 238355.912734609), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fe430>, 238356.241294216), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fe6d0>, 238358.021273164), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fe510>, 238358.021896913)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fda90>, 238357.967030952), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1fd630>, 238357.970247154), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5b066d4e0>, 238357.970571962), (<aiohttp.client_proto.ResponseHandler object at 0x7fa5ad1ff380>, 238357.983321603)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fa5ac99a6d0>
+2026-03-14 16:27:51,437 [asyncio] ERROR: _GatheringFuture exception was never retrieved
+future: <_GatheringFuture finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 640, in run_until_complete
+    self.run_forever()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 607, in run_forever
+    self._run_once()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 1884, in _run_once
+    event_list = self._selector.select(timeout)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/selectors.py", line 468, in select
+    fd_event_list = self._selector.poll(timeout, max_ev)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/dados/ANANKE/crypto_tracker/src/ananke/orderbook.py", line 354, in _fetch_pair_depth
+    ask_snap, bid_snap = await asyncio.gather(ask_task, bid_task)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/dados/ANANKE/crypto_tracker/src/ananke/orderbook.py", line 257, in fetch_depth
+    async with session.get(url, params=params) as resp:
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client.py", line 1510, in __aenter__
+    self._resp: _RetType = await self._coro
+                           ^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client.py", line 779, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client.py", line 757, in _connect_and_send_request
+    await resp.start(conn)
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 539, in start
+    message, payload = await protocol.read()  # type: ignore[union-attr]
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/streams.py", line 703, in read
+    await self._waiter
+asyncio.exceptions.CancelledError
+2026-03-14 16:30:44,404 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa7c4b243d0>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa7c414bbd0>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa7c41607d0>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa7c4161390>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa7c413eac0>, 238529.190712182)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fa7c414bc50>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa7c413def0>, 238530.120135232)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fa7c4160810>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa7c413e7b0>, 238530.069801696)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fa7c41613d0>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa7c4162b50>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa7c4161ed0>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa7c413e6d0>, 238527.517845588), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7a1e65ef0>, 238530.006376573)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fa7c4161f50>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-26' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-27' coro=<BybitExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/bybit.py:109> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-29' coro=<OkxExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/okx.py:98> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-31' coro=<KrakenExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py:153> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-33' coro=<KucoinExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kucoin.py:143> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:30:44,405 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-35' coro=<GateioExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/gateio.py:103> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:30:44,406 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7fa7c4b240d0>
+2026-03-14 16:30:44,406 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae38c0>, 238521.682081815), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae3700>, 238525.936972589), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae22e0>, 238525.942608969), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae39a0>, 238530.027467459), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae3620>, 238530.045154003)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae3460>, 238529.961344879), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae37e0>, 238529.969916067), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae2120>, 238529.976626263), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae3540>, 238529.98872014), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae32a0>, 238530.254986631)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae2e40>, 238530.018150638), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae2f20>, 238530.018239028), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae2cf0>, 238530.021893821), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae2c10>, 238530.351876819), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae2b30>, 238530.352030155)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae3f50>, 238530.281957717), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae3230>, 238530.285166951), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae3150>, 238530.437165463), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae1f60>, 238530.480578426), (<aiohttp.client_proto.ResponseHandler object at 0x7fa7c0ae30e0>, 238530.579631599)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7fa7aa3cf390>
+2026-03-14 16:33:11,722 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3045a5eed0>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3045a5f450>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3045a78050>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3045a78c10>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3045a529e0>, 238676.512055752)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f3045a5f4d0>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3045a52740>, 238677.033746061)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f3045a78090>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3045a52190>, 238678.306810094)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f3045a78c50>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3045a7a3d0>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3045a79750>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3023849d30>, 238674.549544249), (<aiohttp.client_proto.ResponseHandler object at 0x7f3045a52820>, 238676.918152648)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f3045a797d0>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-26' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-27' coro=<BybitExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/bybit.py:109> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-29' coro=<OkxExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/okx.py:98> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:33:11,723 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-31' coro=<KrakenExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py:153> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:33:11,724 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-33' coro=<KucoinExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kucoin.py:143> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:33:11,724 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-35' coro=<GateioExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/gateio.py:103> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:33:11,724 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f3036413950>
+2026-03-14 16:33:11,724 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffed60>, 238670.584757466), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffee40>, 238670.632585896), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffef20>, 238674.822145134), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffe900>, 238674.846830378), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffeac0>, 238674.885959658)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffe740>, 238675.164474953), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffe660>, 238675.168113818), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffe350>, 238675.183797556), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffe270>, 238677.325048091), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffe510>, 238677.327833588)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3023fff3f0>, 238675.089373118), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023fff620>, 238675.112507356), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023fff540>, 238675.162746613), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023fff150>, 238677.256814833), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023fff230>, 238677.26020757)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f3023fffd20>, 238675.411196713), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffc360>, 238675.581723092), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffd780>, 238675.687816652), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023fff0e0>, 238675.696690025), (<aiohttp.client_proto.ResponseHandler object at 0x7f3023ffd630>, 238677.284588385)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f3036412790>
+2026-03-14 16:37:21,958 [aiohttp.server] ERROR: Unhandled exception
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 640, in run_until_complete
+    self.run_forever()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 607, in run_forever
+    self._run_once()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 1922, in _run_once
+    handle._run()
+  File "/usr/lib/python3.11/asyncio/events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "/usr/lib/python3.11/asyncio/selector_events.py", line 952, in _read_ready
+    self._read_ready_cb()
+  File "/usr/lib/python3.11/asyncio/selector_events.py", line 984, in _read_ready__get_buffer
+    self._protocol.buffer_updated(nbytes)
+  File "/usr/lib/python3.11/asyncio/sslproto.py", line 438, in buffer_updated
+    self._do_read()
+  File "/usr/lib/python3.11/asyncio/sslproto.py", line 719, in _do_read
+    def _do_read(self):
+    
+  File "/usr/lib/python3.11/asyncio/runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 510, in _handle_request
+    resp = await request_handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_app.py", line 569, in _handle
+    return await handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/dados/ANANKE/crypto_tracker/src/ananke/web/server.py", line 325, in _ws_handler
+    async for msg in ws:
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_ws.py", line 620, in __anext__
+    msg = await self.receive()
+          ^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_ws.py", line 545, in receive
+    msg = await self._reader.read()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "aiohttp/_websocket/reader_c.py", line 118, in read
+  File "aiohttp/_websocket/reader_c.py", line 115, in aiohttp._websocket.reader_c.WebSocketDataQueue.read
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 602, in start
+    resp, reset = await task
+                  ^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 539, in _handle_request
+    self._handler_waiter.set_result(None)
+asyncio.exceptions.InvalidStateError: invalid state
+2026-03-14 16:37:22,068 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f017a93b750>
+2026-03-14 16:37:22,068 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f017a93bdd0>
+2026-03-14 16:37:22,068 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f017a9549d0>
+2026-03-14 16:37:22,068 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f017a955590>
+2026-03-14 16:37:22,069 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f017a92e900>, 238927.256035891)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f017a9555d0>
+2026-03-14 16:37:22,069 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f017a956d10>
+2026-03-14 16:37:22,069 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f017a956090>
+2026-03-14 16:37:22,069 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f017a92e9e0>, 238925.871351504), (<aiohttp.client_proto.ResponseHandler object at 0x7f0158685fd0>, 238928.499432675)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f017a956110>
+2026-03-14 16:37:22,069 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-26' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:37:22,069 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-27' coro=<BybitExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/bybit.py:109> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:37:22,069 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-29' coro=<OkxExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/okx.py:98> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:37:22,069 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-31' coro=<KrakenExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py:153> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:37:22,069 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-33' coro=<KucoinExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kucoin.py:143> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:37:22,070 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-35' coro=<GateioExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/gateio.py:103> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:37:22,070 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f0163351e10>
+2026-03-14 16:37:22,070 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f01630c2f90>, 238922.999591219), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c23c0>, 238923.029046724), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c2660>, 238924.976660317), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c2c10>, 238927.577953976), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c24a0>, 238927.579119242)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f01630c3e00>, 238924.882379775)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f01630c2eb0>, 238924.965619349), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c2a50>, 238925.535982708), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c2580>, 238927.577154439), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c2dd0>, 238927.578937502), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c3070>, 238927.581809775)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f0163360910>, 238927.391596383), (<aiohttp.client_proto.ResponseHandler object at 0x7f01633607c0>, 238927.685856297), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c19b0>, 238927.690979346), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c3690>, 238927.742289518), (<aiohttp.client_proto.ResponseHandler object at 0x7f0163360a60>, 238928.115454667)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f01633601a0>, 238927.581956133), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c3d20>, 238927.678669881), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c3b60>, 238927.678799635), (<aiohttp.client_proto.ResponseHandler object at 0x7f01633600c0>, 238927.683889509), (<aiohttp.client_proto.ResponseHandler object at 0x7f01630c3c40>, 238928.094108369)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f0163351890>
+2026-03-14 16:38:32,632 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f6c6f44b690>
+2026-03-14 16:38:32,632 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f6c700f6110>
+2026-03-14 16:38:32,633 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f6c6f464750>
+2026-03-14 16:38:32,633 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f6c6f465310>
+2026-03-14 16:38:32,633 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f6c6f43ea50>, 238998.761413981)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f6c6f44bbd0>
+2026-03-14 16:38:32,633 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f6c6f43e820>, 238999.277184462)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f6c6f464790>
+2026-03-14 16:38:32,633 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f6c6f43def0>, 238997.484969112)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f6c6f465350>
+2026-03-14 16:38:32,633 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f6c6f466ad0>
+2026-03-14 16:38:32,633 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f6c6f465e50>
+2026-03-14 16:38:32,633 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f6c6f43d630>, 238997.165755134)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f6c6f465ed0>
+2026-03-14 16:38:32,633 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-26' coro=<BinanceExchange._listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/binance.py:85> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:38:32,633 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-27' coro=<BybitExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/bybit.py:109> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:38:32,634 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-29' coro=<OkxExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/okx.py:98> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:38:32,634 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-31' coro=<KrakenExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kraken.py:153> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:38:32,634 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-33' coro=<KucoinExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/kucoin.py:143> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:38:32,634 [asyncio] ERROR: Task was destroyed but it is pending!
+task: <Task cancelling name='Task-35' coro=<GateioExchange._ws_listen() running at /dados/ANANKE/crypto_tracker/src/ananke/exchanges/gateio.py:103> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /usr/lib/python3.11/asyncio/tasks.py:898, Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /usr/lib/python3.11/asyncio/tasks.py:754]>
+2026-03-14 16:38:32,634 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f6c57b0e610>
+2026-03-14 16:38:32,635 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64fc40>, 238992.742700188), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64f770>, 238994.988334238), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64fd20>, 238996.426799034), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64ff50>, 238996.443759066), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64fb60>, 238996.444339697)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64d4e0>, 238986.657641234), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64c280>, 238990.559136824), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64d940>, 238996.340495944)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64eeb0>, 238996.667990476), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64ef90>, 238998.300929737), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64ec10>, 238998.301570088), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64edd0>, 238998.303336712), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64eb30>, 238998.334975747)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64f850>, 238996.406819407), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64fa10>, 238996.408868845), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64f4d0>, 238996.742736563), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64f2a0>, 238998.348431802), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64f5b0>, 238998.349444541)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f6c6f43ed60>, 238998.30296827), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c6f43e4a0>, 238998.307106072), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c4d64f150>, 238998.307561203), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c6f43e6d0>, 238998.309034924), (<aiohttp.client_proto.ResponseHandler object at 0x7f6c6f43edd0>, 238998.349286758)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f6c57b0c4d0>
