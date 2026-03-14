@@ -281,12 +281,12 @@ class TestGetMetrics:
         assert p["spread_avg"] == 1.5
         assert p["active"] is True
 
-    def test_max_20_pairs(self) -> None:
+    def test_max_50_pairs(self) -> None:
         mc = MetricsCollector()
-        opps = [_opp(base=f"T{i}") for i in range(30)]
+        opps = [_opp(base=f"T{i}") for i in range(60)]
         mc.record(opps)
         m = mc.get_metrics()
-        assert len(m["pairs"]) == 20
+        assert len(m["pairs"]) == 50
 
 
 # ---------------------------------------------------------------------------

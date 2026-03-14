@@ -244,11 +244,28 @@
 
   .metric-card {
     background: #0d1a0d; border: 1px solid var(--green-dark);
-    padding: 10px 16px; min-width: 140px; flex: 1;
+    padding: 10px 16px; min-width: 120px; flex: 1;
   }
   .metric-card .mc-label { font-size: 9px; color: var(--cyan); letter-spacing: 1px; text-transform: uppercase; }
   .metric-card .mc-value { font-size: 18px; color: var(--green); font-weight: 700; margin-top: 4px; }
   .metric-card .mc-sub { font-size: 10px; color: var(--green-dark); margin-top: 2px; }
+  .metric-card .mc-trend { font-size: 11px; margin-left: 6px; }
+  .charts-row { display: flex; gap: 16px; padding: 8px 16px; flex-wrap: wrap; }
+  .chart-box {
+    background: #0d1a0d; border: 1px solid var(--green-dark);
+    padding: 10px 12px; flex: 1; min-width: 280px;
+  }
+  .chart-box .cb-label { font-size: 9px; color: var(--cyan); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .chart-box canvas { width: 100%; height: 120px; display: block; }
+  .status-active { color: var(--green); }
+  .status-gone { color: #333; }
+  #metricsView { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+  #metricsView .metrics-top { flex-shrink: 0; }
+  #metricsView .metrics-table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; }
+  #metricsView .metrics-table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+  #metricsView .metrics-table-wrap::-webkit-scrollbar-track { background: var(--bg); }
+  #metricsView .metrics-table-wrap::-webkit-scrollbar-thumb { background: var(--green-dark); border-radius: 3px; }
+  #metricsView #metricsTable { min-width: 800px; }
 </style>
 </head>
 <body>
@@ -359,22 +376,41 @@
     <tbody id="triTbody"></tbody>
   </table>
   <div id="metricsView" style="display:none;">
-    <div id="metricsCards" style="display:flex;gap:16px;padding:12px 16px;flex-wrap:wrap;"></div>
-    <table id="metricsTable">
-      <thead>
-        <tr>
-          <th data-key="idx" data-table="met" style="width:40px;">#</th>
-          <th data-key="key" data-table="met">PAR</th>
-          <th data-key="freq" data-table="met" class="sorted">FREQ<span class="sort-arrow">&darr;</span></th>
-          <th data-key="spread_avg" data-table="met">AVG SPREAD<span class="sort-arrow">&darr;</span></th>
-          <th data-key="spread_max" data-table="met">MAX SPREAD<span class="sort-arrow">&darr;</span></th>
-          <th data-key="dur" data-table="met">DUR<span class="sort-arrow">&darr;</span></th>
-          <th data-key="ax" data-table="met">ASK EX</th>
-          <th data-key="bx" data-table="met">BID EX</th>
-        </tr>
-      </thead>
-      <tbody id="metricsTbody"></tbody>
-    </table>
+    <div class="metrics-top">
+      <div id="metricsCards" style="display:flex;gap:12px;padding:10px 16px;flex-wrap:wrap;"></div>
+      <div class="charts-row">
+        <div class="chart-box" style="flex:2;">
+          <div class="cb-label">OPPORTUNITIES OVER TIME (5 MIN)</div>
+          <canvas id="chartTimeline" height="120"></canvas>
+        </div>
+        <div class="chart-box" style="flex:1;">
+          <div class="cb-label">SPREAD DISTRIBUTION</div>
+          <canvas id="chartSpread" height="120"></canvas>
+        </div>
+        <div class="chart-box" style="flex:1;">
+          <div class="cb-label">EXCHANGE PARTICIPATION</div>
+          <canvas id="chartExchanges" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="metrics-table-wrap">
+      <table id="metricsTable">
+        <thead>
+          <tr>
+            <th data-key="idx" data-table="met" style="width:32px;">#</th>
+            <th data-key="active" data-table="met" style="width:24px;">ST</th>
+            <th data-key="key" data-table="met">PAIR</th>
+            <th data-key="freq" data-table="met" class="sorted">FREQ<span class="sort-arrow">&darr;</span></th>
+            <th data-key="spread_avg" data-table="met">AVG SPREAD<span class="sort-arrow">&darr;</span></th>
+            <th data-key="spread_max" data-table="met">MAX SPREAD<span class="sort-arrow">&darr;</span></th>
+            <th data-key="dur" data-table="met">DUR<span class="sort-arrow">&darr;</span></th>
+            <th data-key="ax" data-table="met">BUY EX</th>
+            <th data-key="bx" data-table="met">SELL EX</th>
+          </tr>
+        </thead>
+        <tbody id="metricsTbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -911,25 +947,186 @@
     }
   }
 
+  // --- Chart helpers ---
+  function drawTimeline(canvasId, history) {
+    const canvas = $(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth; const h = canvas.clientHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    if (!history || history.length < 2) {
+      ctx.fillStyle = '#333'; ctx.font = '11px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('Collecting data...', w/2, h/2);
+      return;
+    }
+
+    const maxC = Math.max(1, ...history.map(p => p.c));
+    const pad = {t:8, b:18, l:30, r:8};
+    const cw = w - pad.l - pad.r, ch = h - pad.t - pad.b;
+
+    // Grid lines
+    ctx.strokeStyle = '#0a2a0a'; ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+      const y = pad.t + ch * (1 - i/4);
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w-pad.r, y); ctx.stroke();
+    }
+
+    // Area fill
+    ctx.beginPath();
+    ctx.moveTo(pad.l, pad.t + ch);
+    for (let i = 0; i < history.length; i++) {
+      const x = pad.l + (i / (history.length-1)) * cw;
+      const y = pad.t + ch * (1 - history[i].c / maxC);
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(pad.l + cw, pad.t + ch);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t+ch);
+    grad.addColorStop(0, 'rgba(0,255,65,0.25)');
+    grad.addColorStop(1, 'rgba(0,255,65,0.02)');
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    for (let i = 0; i < history.length; i++) {
+      const x = pad.l + (i / (history.length-1)) * cw;
+      const y = pad.t + ch * (1 - history[i].c / maxC);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = '#00ff41'; ctx.lineWidth = 1.5; ctx.stroke();
+
+    // Y axis labels
+    ctx.fillStyle = '#555'; ctx.font = '9px monospace'; ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+      const v = Math.round(maxC * i / 4);
+      const y = pad.t + ch * (1 - i/4);
+      ctx.fillText(v, pad.l-4, y+3);
+    }
+
+    // X axis labels
+    ctx.textAlign = 'center';
+    const tMin = history[0].t, tMax = history[history.length-1].t;
+    for (let i = 0; i <= 4; i++) {
+      const t = tMin + (tMax - tMin) * i / 4;
+      const x = pad.l + (i / 4) * cw;
+      ctx.fillText(Math.round(t)+'s', x, h-4);
+    }
+  }
+
+  function drawSpreadDist(canvasId, dist) {
+    const canvas = $(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth; const h = canvas.clientHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    if (!dist || dist.length === 0) return;
+
+    const maxV = Math.max(1, ...dist.map(b => b.count));
+    const pad = {t:8, b:22, l:8, r:8};
+    const cw = w - pad.l - pad.r, ch = h - pad.t - pad.b;
+    const barW = cw / dist.length - 4;
+
+    for (let i = 0; i < dist.length; i++) {
+      const bh = (dist[i].count / maxV) * ch;
+      const x = pad.l + i * (cw / dist.length) + 2;
+      const y = pad.t + ch - bh;
+
+      const colors = ['#00aa2a','#00ff41','#ffea00','#ff9100','#ff0040'];
+      ctx.fillStyle = dist[i].count > 0 ? colors[i] : '#1a1a1a';
+      ctx.fillRect(x, y, barW, bh);
+
+      // Border
+      ctx.strokeStyle = '#0a3a0a'; ctx.lineWidth = 0.5;
+      ctx.strokeRect(x, y, barW, bh);
+
+      // Count on top
+      if (dist[i].count > 0) {
+        ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+        ctx.fillText(dist[i].count, x + barW/2, y - 3);
+      }
+
+      // Label
+      ctx.fillStyle = '#555'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+      ctx.fillText(dist[i].label, x + barW/2, h - 4);
+    }
+  }
+
+  function drawExchangeBars(canvasId, exchanges) {
+    const canvas = $(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth; const h = canvas.clientHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    if (!exchanges || exchanges.length === 0) return;
+
+    const exs = exchanges.slice(0, 6);
+    const maxV = Math.max(1, exs[0].count);
+    const pad = {t:4, b:4, l:60, r:30};
+    const ch = h - pad.t - pad.b;
+    const barH = Math.min(16, (ch / exs.length) - 4);
+
+    const colors = ['#00ff41','#00e5ff','#ffea00','#ff9100','#ff00ff','#ff0040'];
+
+    for (let i = 0; i < exs.length; i++) {
+      const bw = (exs[i].count / maxV) * (w - pad.l - pad.r);
+      const y = pad.t + i * (ch / exs.length) + 2;
+
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(pad.l, y, bw, barH);
+      ctx.globalAlpha = 1;
+
+      // Exchange name
+      ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.textAlign = 'right';
+      ctx.fillText(exs[i].ex, pad.l - 4, y + barH - 3);
+
+      // Count
+      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.textAlign = 'left';
+      ctx.fillText(exs[i].count, pad.l + bw + 4, y + barH - 3);
+    }
+  }
+
   // --- Render Metrics ---
   function renderMetrics() {
     if (!allMetrics) {
       $metricsCards.innerHTML = '';
-      $metricsTbody.innerHTML = emptyRow(8, 'metrics');
+      $metricsTbody.innerHTML = emptyRow(9, 'metrics');
       $pairCount.textContent = '0';
       $pageInfo.textContent = '1/1';
       return;
     }
     const g = allMetrics.global || {};
+    const trendSign = (g.trend||0) > 0 ? '+' : '';
+    const trendClass = (g.trend||0) > 0 ? 'pos' : (g.trend||0) < 0 ? 'neg' : 'dim';
+    const bestClass = (g.best_spread||0) >= 1 ? 'ylw' : (g.best_spread||0) > 0 ? 'pos' : 'dim';
+
     $metricsCards.innerHTML =
-      '<div class="metric-card"><div class="mc-label">Active Now</div><div class="mc-value">'+(g.total_now||0)+'</div></div>'+
-      '<div class="metric-card"><div class="mc-label">Seen (5m)</div><div class="mc-value">'+(g.total_5m||0)+'</div></div>'+
+      '<div class="metric-card"><div class="mc-label">Active Now</div><div class="mc-value">'+(g.total_now||0)+
+        '<span class="mc-trend '+trendClass+'">'+trendSign+(g.trend||0)+'</span></div></div>'+
+      '<div class="metric-card"><div class="mc-label">Peak (5m)</div><div class="mc-value">'+(g.peak_5m||0)+'</div></div>'+
+      '<div class="metric-card"><div class="mc-label">Unique (5m)</div><div class="mc-value">'+(g.total_5m||0)+'</div></div>'+
       '<div class="metric-card"><div class="mc-label">Avg Spread</div><div class="mc-value">'+(g.avg_spread||0).toFixed(3)+'%</div></div>'+
-      '<div class="metric-card"><div class="mc-label">Buffer</div><div class="mc-value">'+Math.round(allMetrics.buffer_sec||0)+'s</div><div class="mc-sub">of '+allMetrics.window_sec+'s window</div></div>'+
-      (g.top_exchanges && g.top_exchanges.length>0 ?
-        '<div class="metric-card"><div class="mc-label">Top Exchanges</div><div class="mc-value" style="font-size:12px;">'+
-        g.top_exchanges.slice(0,5).map(e => e.ex+' ('+e.count+')').join(', ')+
-        '</div></div>' : '');
+      '<div class="metric-card"><div class="mc-label">Best Spread</div><div class="mc-value '+bestClass+'">'+(g.best_spread||0).toFixed(3)+'%</div></div>'+
+      '<div class="metric-card"><div class="mc-label">Top Exchange</div><div class="mc-value" style="font-size:13px;">'+
+        (g.top_exchanges && g.top_exchanges.length > 0 ? g.top_exchanges[0].ex : '\u2014')+
+      '</div></div>';
+
+    // Draw charts
+    drawTimeline('chartTimeline', allMetrics.history);
+    drawSpreadDist('chartSpread', allMetrics.spread_dist);
+    drawExchangeBars('chartExchanges', g.top_exchanges);
 
     let data = allMetrics.pairs || [];
     if (searchTerm) {
@@ -937,6 +1134,11 @@
       data = data.filter(p => p.key.toUpperCase().includes(s));
     }
     data.sort((a,b) => {
+      if (metSortKey === 'active') {
+        const va = a.active ? 1 : 0, vb = b.active ? 1 : 0;
+        if (va !== vb) return metSortAsc ? (va-vb) : (vb-va);
+        return (b.freq||0) - (a.freq||0);
+      }
       let va=a[metSortKey], vb=b[metSortKey];
       if (typeof va==='string') return metSortAsc?va.localeCompare(vb):vb.localeCompare(va);
       return metSortAsc?(va-vb):(vb-va);
@@ -954,7 +1156,7 @@
     const pageData = data.slice(start, start + PAGE_SIZE);
 
     if (pageData.length === 0) {
-      $metricsTbody.innerHTML = emptyRow(8, 'metrics');
+      $metricsTbody.innerHTML = emptyRow(9, 'metrics');
       return;
     }
 
@@ -962,12 +1164,15 @@
     for (let i=0; i<pageData.length; i++) {
       const p = pageData[i];
       const gi = start + i + 1;
-      const activeClass = p.active ? 'pos' : 'dim';
+      const stClass = p.active ? 'status-active' : 'status-gone';
+      const stLabel = p.active ? '\u25CF' : '\u25CB';
+      const freqClass = p.active ? 'pos' : 'dim';
       buf[i] =
         '<tr>'+
         '<td>'+gi+'</td>'+
+        '<td class="'+stClass+'" style="text-align:center;">'+stLabel+'</td>'+
         '<td class="pair-cell"><span class="pair-base">'+p.b+'</span><span class="pair-quote">/'+p.q+'</span></td>'+
-        '<td class="'+activeClass+'">'+p.freq+'</td>'+
+        '<td class="'+freqClass+'">'+p.freq+'</td>'+
         '<td>'+p.spread_avg.toFixed(3)+'%</td>'+
         '<td class="ylw">'+p.spread_max.toFixed(3)+'%</td>'+
         '<td>'+(p.dur>0?fAge(p.dur*1000):'\u2014')+'</td>'+
