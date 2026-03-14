@@ -6,9 +6,11 @@ Two types of fees matter for cross-exchange arbitrage:
    exchange, hardcoded (lowest public tier, no VIP discount).
 
 2. Withdrawal fees — fixed amount in base asset to transfer between
-   exchanges.  Primary source: KuCoin /api/v3/currencies (public,
-   no API key).  Fallback: withdrawalfees.com (aggregates 16 exchanges).
-   Both use cheapest available network per asset.
+   exchanges.  Per-exchange fees from public endpoints (Binance, KuCoin)
+   and withdrawalfees.com per-exchange pages (Bybit, Gate.io, Kraken).
+   Authenticated APIs (OKX, Binance, Bybit) add data when keys are set.
+   Fallback: withdrawalfees.com min-fee across all exchanges.
+   All sources use cheapest available network per asset.
 
 Net profit after taker fees (scale-independent):
   npf = (bid*(1-sell_taker) - ask*(1+buy_taker)) / (ask*(1+buy_taker)) * 100
@@ -328,8 +330,17 @@ async def _fetch_kucoin_currency_data(
 # ---------------------------------------------------------------------------
 
 _WFEES_BASE = "https://withdrawalfees.com/coins"
+_WFEES_EX_BASE = "https://withdrawalfees.com/exchanges"
 _WFEES_PAGE_SIZE = 50
 _WFEES_DELAY = 0.3  # seconds between requests to avoid rate limiting
+
+# Exchanges to fetch per-exchange fees from withdrawalfees.com.
+# Maps our internal exchange name → wfees slug.
+_WFEES_EXCHANGE_SLUGS: dict[str, str] = {
+    "Bybit": "bybit",
+    "Gate.io": "gate",
+    "Kraken": "kraken",
+}
 
 
 def _parse_wfees_page(raw: dict) -> dict[str, float]:
@@ -415,6 +426,122 @@ async def _fetch_wfees_fallback(
         len(result),
     )
     return result
+
+
+def _parse_wfees_exchange_page(
+    raw: dict,
+) -> dict[str, float]:
+    """Parse a withdrawalfees.com /exchanges/{slug} page.
+
+    Returns {SYMBOL: cheapest_withdrawal_fee} for that exchange.
+    Multiple chains per coin → keeps the minimum fee.
+    """
+    result: dict[str, float] = {}
+    try:
+        flat = raw["nodes"][1]["data"]
+        schema = flat[0]
+        fee_indices = flat[schema["fees"]]
+        for fi in fee_indices:
+            entry = flat[fi]
+            amount = flat[entry["amount"]]
+            if not isinstance(amount, (int, float)) or amount < 0:
+                continue
+            coin_obj = flat[entry["coin"]]
+            sym = flat[coin_obj["symbol"]].upper()
+            # Keep cheapest chain per symbol
+            if sym not in result or amount < result[sym]:
+                result[sym] = amount
+    except (KeyError, IndexError, TypeError):
+        pass
+    return result
+
+
+def _parse_wfees_exchange_total_pages(raw: dict) -> int:
+    """Extract total pages from a /exchanges/{slug} response."""
+    try:
+        flat = raw["nodes"][1]["data"]
+        schema = flat[0]
+        count = flat[schema["count"]]
+        return (count // _WFEES_PAGE_SIZE) + 1
+    except (KeyError, IndexError, TypeError):
+        return 0
+
+
+async def _fetch_wfees_exchange(
+    session: aiohttp.ClientSession,
+    exchange: str,
+    slug: str,
+) -> _CurrencyData:
+    """Fetch per-coin withdrawal fees for one exchange from withdrawalfees.com.
+
+    Paginates through /exchanges/{slug}/{page}/__data.json.
+    Returns _CurrencyData with fees (cheapest network per symbol).
+    """
+    result = _CurrencyData(exchange)
+    base_url = f"{_WFEES_EX_BASE}/{slug}"
+
+    # First page
+    try:
+        async with session.get(f"{base_url}/__data.json") as resp:
+            if resp.status != 200:
+                logger.debug(
+                    "wfees /exchanges/%s returned %d", slug, resp.status,
+                )
+                return result
+            first = await resp.json(content_type=None)
+    except Exception:
+        logger.debug("wfees /exchanges/%s unreachable", slug, exc_info=True)
+        return result
+
+    total_pages = _parse_wfees_exchange_total_pages(first)
+    if total_pages <= 0:
+        return result
+
+    fees = _parse_wfees_exchange_page(first)
+
+    for page in range(2, total_pages + 1):
+        await asyncio.sleep(_WFEES_DELAY)
+        try:
+            async with session.get(
+                f"{base_url}/{page}/__data.json",
+            ) as resp:
+                if resp.status != 200:
+                    continue
+                data = await resp.json(content_type=None)
+                page_fees = _parse_wfees_exchange_page(data)
+                for sym, fee in page_fees.items():
+                    if sym not in fees or fee < fees[sym]:
+                        fees[sym] = fee
+        except Exception:
+            logger.debug("wfees /exchanges/%s page %d failed", slug, page)
+
+    # Only keep fees > 0 (zero-fee chains are real but don't
+    # overwrite a known positive fee from a better source)
+    for sym, fee in fees.items():
+        result.fees[sym] = fee
+
+    logger.info(
+        "wfees %s: %d withdrawal fees",
+        exchange, len(result.fees),
+    )
+    return result
+
+
+async def _fetch_wfees_exchanges(
+    session: aiohttp.ClientSession,
+) -> list[_CurrencyData]:
+    """Fetch withdrawal fees for all configured exchanges from withdrawalfees.com.
+
+    Fetches sequentially per exchange (each exchange paginates internally)
+    to stay friendly with rate limits.
+    """
+    results: list[_CurrencyData] = []
+    for exchange, slug in _WFEES_EXCHANGE_SLUGS.items():
+        cd = await _fetch_wfees_exchange(session, exchange, slug)
+        results.append(cd)
+        # Small delay between exchanges
+        await asyncio.sleep(_WFEES_DELAY)
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -623,10 +750,88 @@ async def _fetch_okx_currency_data(
 
 
 # ---------------------------------------------------------------------------
-# Binance transfer status + withdrawal fees (requires API key)
+# Binance transfer status + withdrawal fees
 # ---------------------------------------------------------------------------
 
 _BINANCE_CAPITAL_CONFIG = "https://api.binance.com/sapi/v1/capital/config/getall"
+_BINANCE_PUBLIC_COINS = (
+    "https://www.binance.com/bapi/capital/v1/public/capital/getNetworkCoinAll"
+)
+
+
+async def _fetch_binance_public_currency_data(
+    session: aiohttp.ClientSession,
+) -> _CurrencyData:
+    """Fetch withdrawal fees + transfer status from Binance public endpoint.
+
+    No API key required.  Uses the same data source as the Binance fee page
+    (binance.com/en/fee/cryptoFee).  Response format mirrors the authenticated
+    /sapi/v1/capital/config/getall endpoint.
+    """
+    result = _CurrencyData("Binance")
+    exchange = result.exchange
+
+    headers = {
+        "Accept-Encoding": "gzip, deflate",
+        "User-Agent": "Mozilla/5.0",
+    }
+
+    try:
+        async with session.get(
+            _BINANCE_PUBLIC_COINS, headers=headers,
+        ) as resp:
+            if resp.status != 200:
+                logger.warning(
+                    "Binance public /getNetworkCoinAll returned %d",
+                    resp.status,
+                )
+                return result
+            body = await resp.json(content_type=None)
+    except Exception:
+        logger.warning(
+            "Binance public /getNetworkCoinAll unreachable", exc_info=True,
+        )
+        return result
+
+    data = body.get("data") if isinstance(body, dict) else body
+    if not data:
+        logger.warning("Binance public /getNetworkCoinAll: empty data")
+        return result
+
+    for coin_info in data:
+        sym = coin_info.get("coin", "").upper()
+        if not sym:
+            continue
+
+        networks = coin_info.get("networkList", [])
+        any_withdraw = False
+        any_deposit = False
+        fees: list[float] = []
+
+        for net in networks:
+            if net.get("withdrawEnable"):
+                any_withdraw = True
+                fee = _safe_float(net.get("withdrawFee"))
+                if fee > 0:
+                    fees.append(fee)
+            if net.get("depositEnable"):
+                any_deposit = True
+
+        if fees:
+            result.fees[sym] = min(fees)
+        if not any_withdraw:
+            result.withdraw_blocked.add((exchange, sym))
+        if not any_deposit:
+            result.deposit_blocked.add((exchange, sym))
+
+    logger.info(
+        "Binance (public): %d withdrawal fees, "
+        "%d withdraw-blocked, %d deposit-blocked",
+        len(result.fees),
+        len(result.withdraw_blocked),
+        len(result.deposit_blocked),
+    )
+    return result
 
 
 def _binance_sign(secret: str, query_string: str) -> str:
@@ -815,13 +1020,16 @@ async def build_fee_registry() -> FeeRegistry:
     """Build the fee registry.
 
     Withdrawal fee sources (cached 24h):
-      1. Per-exchange APIs (KuCoin, OKX, Binance, Bybit) — per-chain fees
-      2. withdrawalfees.com — fallback for missing symbols (~32 pages)
+      1. Binance public /getNetworkCoinAll — per-network (no key needed)
+      2. Per-exchange APIs (KuCoin, OKX, Binance auth, Bybit) — per-chain
+      3. withdrawalfees.com per-exchange — covers Bybit, Gate.io, Kraken
+      4. withdrawalfees.com min fallback — remaining symbols (~32 pages)
 
     Transfer status sources (same cache):
       - KuCoin /api/v3/currencies — per-chain (public, no key)
       - Gate.io /api/v4/spot/currencies — per-coin (public, no key)
       - Kraken /0/public/Assets — per-asset status (public, no key)
+      - Binance public /getNetworkCoinAll — per-network (no key needed)
       - OKX /api/v5/asset/currencies — per-chain (requires API key)
       - Binance /sapi/v1/capital/config/getall — per-network (requires API key)
       - Bybit /v5/asset/coin/query-info — per-chain (requires API key)
@@ -848,7 +1056,8 @@ async def build_fee_registry() -> FeeRegistry:
                 (gateio_wb, gateio_db),
                 (kraken_wb, kraken_db),
                 okx_data,
-                binance_data,
+                binance_auth_data,
+                binance_pub_data,
                 bybit_data,
             ) = await asyncio.gather(
                 _fetch_kucoin_currency_data(session),
@@ -856,7 +1065,24 @@ async def build_fee_registry() -> FeeRegistry:
                 _fetch_kraken_transfer_status(session),
                 _fetch_okx_currency_data(session),
                 _fetch_binance_currency_data(session),
+                _fetch_binance_public_currency_data(session),
                 _fetch_bybit_currency_data(session),
+            )
+
+            # Merge Binance: auth wins when available, public fills gaps
+            binance_data = _CurrencyData("Binance")
+            for sym, fee in binance_pub_data.fees.items():
+                binance_data.fees[sym] = fee
+            binance_data.withdraw_blocked.update(binance_pub_data.withdraw_blocked)
+            binance_data.deposit_blocked.update(binance_pub_data.deposit_blocked)
+            # Auth data overwrites (may reflect VIP-specific fees)
+            for sym, fee in binance_auth_data.fees.items():
+                binance_data.fees[sym] = fee
+            binance_data.withdraw_blocked = (
+                binance_auth_data.withdraw_blocked or binance_data.withdraw_blocked
+            )
+            binance_data.deposit_blocked = (
+                binance_auth_data.deposit_blocked or binance_data.deposit_blocked
             )
 
             # Collect per-exchange withdrawal fees
@@ -877,7 +1103,20 @@ async def build_fee_registry() -> FeeRegistry:
             for cd in (bybit_data, binance_data, okx_data, kucoin_data):
                 fallback_withdrawal.update(cd.fees)
 
-            # withdrawalfees.com fills remaining gaps
+            # withdrawalfees.com per-exchange: covers Bybit, Gate.io, Kraken
+            # Only add if we don't already have exchange-specific data
+            # (auth APIs are more authoritative when available)
+            wfees_ex_data = await _fetch_wfees_exchanges(session)
+            wfees_ex_count = 0
+            for cd in wfees_ex_data:
+                for sym, fee in cd.fees.items():
+                    key = (cd.exchange, sym)
+                    if key not in withdrawal:
+                        withdrawal[key] = fee
+                        wfees_ex_count += 1
+                # wfees doesn't provide transfer status — keep existing
+
+            # withdrawalfees.com min-fee fills remaining gaps
             wfees = await _fetch_wfees_fallback(session)
             fallback_count = 0
             for sym, fee in wfees.items():
@@ -893,6 +1132,11 @@ async def build_fee_registry() -> FeeRegistry:
             ]:
                 if cd.fees:
                     sources.append(f"{len(cd.fees)} from {label}")
+            for cd in wfees_ex_data:
+                if cd.fees:
+                    sources.append(
+                        f"{len(cd.fees)} from wfees/{cd.exchange}",
+                    )
             if fallback_count:
                 sources.append(f"{fallback_count} from withdrawalfees.com")
             logger.info("Withdrawal fees: %s", ", ".join(sources) or "none")

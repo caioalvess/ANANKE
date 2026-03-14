@@ -4450,3 +4450,82 @@ client_session: <aiohttp.client.ClientSession object at 0x7f2907394bd0>
 2026-03-13 14:34:04,267 [asyncio] ERROR: Unclosed connector
 connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f2907351f60>, 186285.701857998), (<aiohttp.client_proto.ResponseHandler object at 0x7f2907352a50>, 186289.663286245), (<aiohttp.client_proto.ResponseHandler object at 0x7f29073518d0>, 186293.700383781)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f2907352cf0>, 186293.578888693), (<aiohttp.client_proto.ResponseHandler object at 0x7f2907351320>, 186293.582753829), (<aiohttp.client_proto.ResponseHandler object at 0x7f29073502f0>, 186293.584592593), (<aiohttp.client_proto.ResponseHandler object at 0x7f29073530e0>, 186293.586847275)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f28fca6be00>, 186293.618927213), (<aiohttp.client_proto.ResponseHandler object at 0x7f2907353d20>, 186293.90528435), (<aiohttp.client_proto.ResponseHandler object at 0x7f29073533f0>, 186293.90674131), (<aiohttp.client_proto.ResponseHandler object at 0x7f29073529e0>, 186293.909557976), (<aiohttp.client_proto.ResponseHandler object at 0x7f28fca6ad60>, 186293.916219589)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f29073515c0>, 186293.892447722), (<aiohttp.client_proto.ResponseHandler object at 0x7f2907351a20>, 186293.897742764), (<aiohttp.client_proto.ResponseHandler object at 0x7f29073538c0>, 186293.938027326), (<aiohttp.client_proto.ResponseHandler object at 0x7f2907353230>, 186293.948662513), (<aiohttp.client_proto.ResponseHandler object at 0x7f2907350130>, 186294.169978057)])', 'deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f2907350c20>, 186294.648497637), (<aiohttp.client_proto.ResponseHandler object at 0x7f29073514e0>, 186294.652615083), (<aiohttp.client_proto.ResponseHandler object at 0x7f291ea3e7b0>, 186294.695769359)])']
 connector: <aiohttp.connector.TCPConnector object at 0x7f2907396a50>
+2026-03-13 16:57:14,925 [aiohttp.server] ERROR: Unhandled exception
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 640, in run_until_complete
+    self.run_forever()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 607, in run_forever
+    self._run_once()
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 1884, in _run_once
+    event_list = self._selector.select(timeout)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/selectors.py", line 468, in select
+    fd_event_list = self._selector.poll(timeout, max_ev)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 510, in _handle_request
+    resp = await request_handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_app.py", line 569, in _handle
+    return await handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/dados/ANANKE/crypto_tracker/src/ananke/web/server.py", line 311, in _ws_handler
+    async for msg in ws:
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_ws.py", line 620, in __anext__
+    msg = await self.receive()
+          ^^^^^^^^^^^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_ws.py", line 545, in receive
+    msg = await self._reader.read()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "aiohttp/_websocket/reader_c.py", line 118, in read
+  File "aiohttp/_websocket/reader_c.py", line 115, in aiohttp._websocket.reader_c.WebSocketDataQueue.read
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 602, in start
+    resp, reset = await task
+                  ^^^^^^^^^^
+  File "/home/caio/.local/lib/python3.11/site-packages/aiohttp/web_protocol.py", line 539, in _handle_request
+    self._handler_waiter.set_result(None)
+asyncio.exceptions.InvalidStateError: invalid state
+2026-03-13 20:59:45,882 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f014da538d0>
+2026-03-13 20:59:45,883 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f014da53fd0>
+2026-03-13 20:59:45,883 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f014da64bd0>
+2026-03-13 20:59:45,883 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f014da65790>
+2026-03-13 20:59:45,883 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f014da66290>
+2026-03-13 20:59:45,883 [asyncio] ERROR: Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x7f014da66f10>
+2026-03-13 20:59:45,883 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f014da46430>, 209437.95127688)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f014da53910>
+2026-03-13 20:59:45,883 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f014da46740>, 209439.864313791)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f014da64090>
+2026-03-13 20:59:45,883 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f014da460b0>, 209439.79782197)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f014da657d0>
+2026-03-13 20:59:45,884 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f014da469e0>, 209439.766758724)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f014da66310>
+2026-03-13 20:59:45,884 [asyncio] ERROR: Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7f014da46890>, 209439.410203824)])']
+connector: <aiohttp.connector.TCPConnector object at 0x7f014da66f90>
