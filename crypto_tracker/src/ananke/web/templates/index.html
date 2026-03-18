@@ -57,8 +57,8 @@
     z-index: 9998;
   }
 
-  .header { padding: 8px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .header { flex-shrink: 0; padding-bottom: 8px; }
+  .header-top { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--green-dark); }
 
   .logo {
     font-size: 18px; font-weight: 700; letter-spacing: 4px;
@@ -88,7 +88,7 @@
     50% { box-shadow: 0 0 10px var(--green), 0 0 20px var(--green-dim); }
   }
 
-  .controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 0 16px; margin-top: 10px; }
   .ctrl-group { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
   .ctrl-label { color: var(--cyan); font-size: 10px; letter-spacing: 1px; margin-right: 2px; }
 
@@ -139,7 +139,7 @@
   .pager-btn:hover { border-color: var(--green); color: var(--green); }
   .pager-btn:disabled { opacity: 0.3; cursor: default; }
 
-  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; }
+  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; position: relative; }
   .table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
   .table-wrap::-webkit-scrollbar-track { background: var(--bg); }
   .table-wrap::-webkit-scrollbar-thumb { background: var(--green-dark); border-radius: 3px; }
@@ -202,9 +202,12 @@
   }
 
   .loading {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
     display: flex; align-items: center; justify-content: center;
-    height: 100%; font-size: 14px; color: var(--green-dim);
+    font-size: 14px; color: var(--green-dim);
     flex-direction: column; gap: 15px;
+    background: var(--bg);
+    z-index: 20;
   }
   .loading-spinner {
     width: 40px; height: 40px;
@@ -244,11 +247,42 @@
 
   .metric-card {
     background: #0d1a0d; border: 1px solid var(--green-dark);
-    padding: 10px 16px; min-width: 120px; flex: 1;
+    border-top: 2px solid var(--green-dark);
+    padding: 10px 14px; min-width: 100px; flex: 1;
+    transition: border-color .2s, box-shadow .2s;
   }
-  .metric-card .mc-label { font-size: 9px; color: var(--cyan); letter-spacing: 1px; text-transform: uppercase; }
-  .metric-card .mc-value { font-size: 18px; color: var(--green); font-weight: 700; margin-top: 4px; }
-  .metric-card .mc-sub { font-size: 10px; color: var(--green-dark); margin-top: 2px; }
+  .metric-card:hover { border-color: #0f4f0f; }
+  .metric-card:nth-child(1) { border-top-color: var(--cyan); }
+  .metric-card:nth-child(2) { border-top-color: var(--green); }
+  .metric-card:nth-child(3) { border-top-color: var(--yellow); }
+  .metric-card:nth-child(4) { border-top-color: var(--orange); }
+  .metric-card:nth-child(5) { border-top-color: var(--magenta); }
+  .metric-card:nth-child(6) { border-top-color: var(--cyan); }
+  .metric-card:nth-child(1):hover { box-shadow: 0 0 12px rgba(0,229,255,0.08); }
+  .metric-card:nth-child(2):hover { box-shadow: 0 0 12px rgba(0,255,65,0.08); }
+  .metric-card:nth-child(3):hover { box-shadow: 0 0 12px rgba(255,234,0,0.08); }
+  .metric-card:nth-child(4):hover { box-shadow: 0 0 12px rgba(255,145,0,0.08); }
+  .metric-card:nth-child(5):hover { box-shadow: 0 0 12px rgba(255,0,255,0.08); }
+  .metric-card:nth-child(6):hover { box-shadow: 0 0 12px rgba(0,229,255,0.08); }
+  .metric-card .mc-label { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+  .metric-card:nth-child(1) .mc-label { color: var(--cyan); }
+  .metric-card:nth-child(2) .mc-label { color: var(--green); }
+  .metric-card:nth-child(3) .mc-label { color: var(--yellow); }
+  .metric-card:nth-child(4) .mc-label { color: var(--orange); }
+  .metric-card:nth-child(5) .mc-label { color: var(--magenta); }
+  .metric-card:nth-child(6) .mc-label { color: var(--cyan); }
+  .metric-card .mc-value { font-size: 20px; color: var(--green); font-weight: 700; margin-top: 4px; text-shadow: 0 0 6px rgba(0,255,65,0.2); }
+  .metric-card .mc-value.mc-loading {
+    color: var(--dim) !important;
+    text-shadow: none !important;
+  }
+  .chart-box .chart-loading {
+    color: var(--dim);
+    font-size: 12px;
+    text-align: center;
+    padding: 40px 0;
+  }
+  .metric-card .mc-sub { font-size: 10px; color: #00aa2a; margin-top: 3px; line-height: 1.4; }
   .metric-card .mc-trend { font-size: 11px; margin-left: 6px; }
   .charts-row { display: flex; gap: 16px; padding: 8px 16px; flex-wrap: wrap; }
   .chart-box {
@@ -377,19 +411,47 @@
   </table>
   <div id="metricsView" style="display:none;">
     <div class="metrics-top">
-      <div id="metricsCards" style="display:flex;gap:12px;padding:10px 16px;flex-wrap:wrap;"></div>
+      <div id="metricsCards" style="display:flex;gap:12px;padding:10px 16px;flex-wrap:wrap;">
+        <div class="metric-card">
+          <div class="mc-label">Active Now</div>
+          <div class="mc-value mc-loading" id="mcActiveNow">&mdash;</div>
+        </div>
+        <div class="metric-card">
+          <div class="mc-label">Peak (5m)</div>
+          <div class="mc-value mc-loading" id="mcPeak">&mdash;</div>
+</div>
+        <div class="metric-card">
+          <div class="mc-label">Unique (5m)</div>
+          <div class="mc-value mc-loading" id="mcUnique">&mdash;</div>
+</div>
+        <div class="metric-card">
+          <div class="mc-label">Avg Spread</div>
+          <div class="mc-value mc-loading" id="mcAvgSpread">&mdash;</div>
+</div>
+        <div class="metric-card">
+          <div class="mc-label">Best Spread</div>
+          <div class="mc-value mc-loading" id="mcBestSpread">&mdash;</div>
+</div>
+        <div class="metric-card">
+          <div class="mc-label">Top Exchange</div>
+          <div class="mc-value mc-loading" id="mcTopExchange">&mdash;</div>
+</div>
+      </div>
       <div class="charts-row">
         <div class="chart-box" style="flex:2;">
           <div class="cb-label">OPPORTUNITIES OVER TIME (5 MIN)</div>
-          <canvas id="chartTimeline" height="120"></canvas>
+          <div class="chart-loading mc-loading" id="chartTimelineLoading">&mdash;</div>
+          <canvas id="chartTimeline" height="120" style="display:none;"></canvas>
         </div>
         <div class="chart-box" style="flex:1;">
           <div class="cb-label">SPREAD DISTRIBUTION</div>
-          <canvas id="chartSpread" height="120"></canvas>
+          <div class="chart-loading mc-loading" id="chartSpreadLoading">&mdash;</div>
+          <canvas id="chartSpread" height="120" style="display:none;"></canvas>
         </div>
         <div class="chart-box" style="flex:1;">
           <div class="cb-label">EXCHANGE PARTICIPATION</div>
-          <canvas id="chartExchanges" height="120"></canvas>
+          <div class="chart-loading mc-loading" id="chartExchangesLoading">&mdash;</div>
+          <canvas id="chartExchanges" height="120" style="display:none;"></canvas>
         </div>
       </div>
     </div>
@@ -665,6 +727,23 @@
     } else if (isMet) {
       $metricsView.style.display = '';
       $statsLabel.textContent = 'PAIRS:';
+      // Hide global loading overlay so metric cards are visible
+      $loading.style.display = 'none';
+      if (allMetrics) {
+        renderMetrics();
+      } else {
+        // Reset cards to loading state
+        ['mcActiveNow','mcPeak','mcUnique','mcAvgSpread','mcBestSpread','mcTopExchange'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) {
+            el.textContent = '\u2014';
+            el.classList.add('mc-loading');
+            el.style.fontSize = '';
+          }
+        });
+        startCardPulse();
+        $metricsTbody.innerHTML = emptyRow(9, 'metrics');
+      }
     }
     $arbFilterGroups.forEach(el => { el.style.display = isArb ? '' : 'none'; });
     // Hide quote filter for triangular & metrics
@@ -948,7 +1027,15 @@
   }
 
   // --- Chart helpers ---
+  function showChart(canvasId) {
+    var canvas = $(canvasId);
+    var loadingEl = $(canvasId + 'Loading');
+    if (canvas) canvas.style.display = '';
+    if (loadingEl) { loadingEl.style.display = 'none'; loadingEl.classList.remove('mc-loading'); }
+  }
+
   function drawTimeline(canvasId, history) {
+    showChart(canvasId);
     const canvas = $(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -1018,6 +1105,7 @@
   }
 
   function drawSpreadDist(canvasId, dist) {
+    showChart(canvasId);
     const canvas = $(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -1060,6 +1148,7 @@
   }
 
   function drawExchangeBars(canvasId, exchanges) {
+    showChart(canvasId);
     const canvas = $(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -1098,10 +1187,48 @@
     }
   }
 
+  // --- Card Loading Pulse (JS-based, works even after display:none) ---
+  var _cardPulseTimer = null;
+  function startCardPulse() {
+    stopCardPulse();
+    var up = true;
+    var opacity = 0.3;
+    _cardPulseTimer = setInterval(function() {
+      var els = document.querySelectorAll('.mc-value.mc-loading');
+      if (els.length === 0) { stopCardPulse(); return; }
+      opacity += up ? 0.05 : -0.05;
+      if (opacity >= 0.8) up = false;
+      if (opacity <= 0.3) up = true;
+      els.forEach(function(el) { el.style.opacity = opacity; });
+    }, 50);
+  }
+  function stopCardPulse() {
+    if (_cardPulseTimer) { clearInterval(_cardPulseTimer); _cardPulseTimer = null; }
+    document.querySelectorAll('.mc-value.mc-loading').forEach(function(el) { el.style.opacity = ''; });
+  }
+
+  // --- Flash Update (same as Prometheus) ---
+  function flashUpdate(elementId, newValue) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.classList.remove('mc-loading');
+    el.style.opacity = '';
+    el.textContent = newValue;
+    el.style.transition = 'none';
+    el.style.textShadow = '0 0 12px var(--green), 0 0 24px var(--green)';
+    el.style.color = 'var(--green)';
+    setTimeout(function() {
+      el.style.transition = 'text-shadow 1s, color 1s';
+      el.style.textShadow = '';
+      el.style.color = '';
+    }, 50);
+    // Stop pulse if no more loading cards
+    if (!document.querySelector('.mc-value.mc-loading')) stopCardPulse();
+  }
+
   // --- Render Metrics ---
   function renderMetrics() {
     if (!allMetrics) {
-      $metricsCards.innerHTML = '';
       $metricsTbody.innerHTML = emptyRow(9, 'metrics');
       $pairCount.textContent = '0';
       $pageInfo.textContent = '1/1';
@@ -1109,19 +1236,25 @@
     }
     const g = allMetrics.global || {};
     const trendSign = (g.trend||0) > 0 ? '+' : '';
-    const trendClass = (g.trend||0) > 0 ? 'pos' : (g.trend||0) < 0 ? 'neg' : 'dim';
-    const bestClass = (g.best_spread||0) >= 1 ? 'ylw' : (g.best_spread||0) > 0 ? 'pos' : 'dim';
+    const trendVal = (g.trend||0);
+    const activeText = (g.total_now||0) + (trendVal !== 0 ? ' ' + trendSign + trendVal : '');
 
-    $metricsCards.innerHTML =
-      '<div class="metric-card"><div class="mc-label">Active Now</div><div class="mc-value">'+(g.total_now||0)+
-        '<span class="mc-trend '+trendClass+'">'+trendSign+(g.trend||0)+'</span></div></div>'+
-      '<div class="metric-card"><div class="mc-label">Peak (5m)</div><div class="mc-value">'+(g.peak_5m||0)+'</div></div>'+
-      '<div class="metric-card"><div class="mc-label">Unique (5m)</div><div class="mc-value">'+(g.total_5m||0)+'</div></div>'+
-      '<div class="metric-card"><div class="mc-label">Avg Spread</div><div class="mc-value">'+(g.avg_spread||0).toFixed(3)+'%</div></div>'+
-      '<div class="metric-card"><div class="mc-label">Best Spread</div><div class="mc-value '+bestClass+'">'+(g.best_spread||0).toFixed(3)+'%</div></div>'+
-      '<div class="metric-card"><div class="mc-label">Top Exchange</div><div class="mc-value" style="font-size:13px;">'+
-        (g.top_exchanges && g.top_exchanges.length > 0 ? g.top_exchanges[0].ex : '\u2014')+
-      '</div></div>';
+    flashUpdate('mcActiveNow', activeText);
+    flashUpdate('mcPeak', g.peak_5m || 0);
+    flashUpdate('mcUnique', g.total_5m || 0);
+    flashUpdate('mcAvgSpread', (g.avg_spread||0).toFixed(3) + '%');
+    flashUpdate('mcBestSpread', (g.best_spread||0).toFixed(3) + '%');
+
+    const topEx = g.top_exchanges && g.top_exchanges.length > 0 ? g.top_exchanges[0].ex : '\u2014';
+    const topEl = document.getElementById('mcTopExchange');
+    if (topEl) {
+      topEl.classList.remove('mc-loading');
+      topEl.textContent = topEx;
+      topEl.style.fontSize = '13px';
+      topEl.style.transition = 'none';
+      topEl.style.textShadow = '0 0 12px var(--green), 0 0 24px var(--green)';
+      setTimeout(function() { topEl.style.transition = 'text-shadow 1s'; topEl.style.textShadow = ''; }, 50);
+    }
 
     // Draw charts
     drawTimeline('chartTimeline', allMetrics.history);

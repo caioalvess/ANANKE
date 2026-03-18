@@ -200,7 +200,10 @@ class OkxExchange(Exchange):
             await asyncio.sleep(self.config.poll_interval_sec)
 
     async def _fetch_tickers(self) -> None:
-        """Fetch all spot tickers via REST (fallback)."""
+        """Fetch all spot tickers via REST (fallback).
+
+        Updates price/volume/change but preserves WS bid/ask when available.
+        """
         session = await self._get_session()
         url = f"{self.config.rest_url}/api/v5/market/tickers"
 
@@ -221,6 +224,25 @@ class OkxExchange(Exchange):
             open_24h = safe_float(item.get("open24h"))
             price_change = price - open_24h if open_24h else 0.0
             price_change_pct = (price_change / open_24h * 100) if open_24h else 0.0
+            rest_bid = safe_float(item.get("bidPx"))
+            rest_ask = safe_float(item.get("askPx"))
+
+            existing = self.tickers.get(symbol)
+            if existing:
+                existing.price = price
+                existing.price_change = price_change
+                existing.price_change_pct = price_change_pct
+                existing.high_24h = safe_float(item.get("high24h"))
+                existing.low_24h = safe_float(item.get("low24h"))
+                existing.volume_base = safe_float(item.get("vol24h"))
+                existing.volume_quote = safe_float(item.get("volCcy24h"))
+                existing.open_price = open_24h
+                if rest_bid > 0:
+                    existing.bid = rest_bid
+                if rest_ask > 0:
+                    existing.ask = rest_ask
+                existing.last_update = now
+                continue
 
             self.tickers[symbol] = Ticker(
                 symbol=symbol,
@@ -233,8 +255,8 @@ class OkxExchange(Exchange):
                 low_24h=safe_float(item.get("low24h")),
                 volume_base=safe_float(item.get("vol24h")),
                 volume_quote=safe_float(item.get("volCcy24h")),
-                bid=safe_float(item.get("bidPx")),
-                ask=safe_float(item.get("askPx")),
+                bid=rest_bid,
+                ask=rest_ask,
                 open_price=open_24h,
                 trades_count=0,
                 last_update=now,

@@ -69,7 +69,8 @@ def _compute_arbitrage(
     same-symbol-different-token collisions.  Ambiguous or unknown symbols
     are excluded from cross-exchange grouping.
     """
-    best: dict[tuple[str, str], dict[str, str | float | bool]] = {}
+    # Group all tickers by canonical identity + quote
+    groups: dict[tuple[str, str], list[Ticker]] = {}
     has_registry = registry is not None and registry.has_data()
     min_vol = arb_config.min_volume_quote if arb_config else 0.0
     max_spread = arb_config.max_pair_spread_pct / 100 if arb_config else 0.0
@@ -78,7 +79,6 @@ def _compute_arbitrage(
     for t in all_tickers:
         if t.bid <= 0 or t.ask <= 0:
             continue
-        # Pre-grouping liquidity filters
         if min_vol > 0 and t.volume_quote < min_vol:
             continue
         if max_spread > 0 and (t.ask - t.bid) / t.bid > max_spread:
@@ -88,115 +88,87 @@ def _compute_arbitrage(
             assert registry is not None
             canonical_id = registry.resolve(t.base_asset, t.exchange)
             if canonical_id is None:
-                continue  # ambiguous, unknown, or unconfirmed — skip
+                continue
             key = (canonical_id, t.quote_asset)
         else:
-            # Graceful degradation — no registry available
             key = (t.base_asset, t.quote_asset)
 
-        ts = int(t.last_update.timestamp() * 1000)
+        groups.setdefault(key, []).append(t)
 
-        entry = best.get(key)
-        if entry is None:
-            best[key] = {
-                "symbol": t.symbol,
-                "base": t.base_asset,
-                "quote": t.quote_asset,
-                "max_bid": t.bid,
-                "max_bid_ex": t.exchange,
-                "max_bid_vol": t.volume_quote,
-                "max_bid_ts": ts,
-                "min_ask": t.ask,
-                "min_ask_ex": t.exchange,
-                "min_ask_vol": t.volume_quote,
-                "min_ask_ts": ts,
-                "first_ex": t.exchange,
-                "multi": False,
-            }
-        else:
-            if t.exchange != entry["first_ex"]:
-                entry["multi"] = True
-            if t.bid > entry["max_bid"]:
-                entry["max_bid"] = t.bid
-                entry["max_bid_ex"] = t.exchange
-                entry["max_bid_vol"] = t.volume_quote
-                entry["max_bid_ts"] = ts
-            if t.ask < entry["min_ask"]:
-                entry["min_ask"] = t.ask
-                entry["min_ask_ex"] = t.exchange
-                entry["min_ask_vol"] = t.volume_quote
-                entry["min_ask_ts"] = ts
-
+    # Generate ALL cross-exchange pairs where bid > ask
     results: list[dict[str, str | float]] = []
-    for entry in best.values():
-        if not entry["multi"]:
-            continue
-        if entry["max_bid_ex"] == entry["min_ask_ex"]:
-            continue
-        if entry["max_bid"] <= entry["min_ask"]:
-            continue
-        bid = entry["max_bid"]
-        ask = entry["min_ask"]
-        profit = (bid - ask) / ask * 100
+    now_ms = int(time.time() * 1000)
+    ref_size = arb_config.ref_trade_size if arb_config else 1000.0
 
-        if min_profit > 0 and profit < min_profit:
+    for tickers in groups.values():
+        if len(tickers) < 2:
             continue
 
-        # Net profit after taker fees
-        if fees:
-            net_pf = fees.net_profit_after_taker(
-                bid=bid,
-                ask=ask,
-                bid_exchange=entry["max_bid_ex"],
-                ask_exchange=entry["min_ask_ex"],
-            )
-            # Rebal cost: withdrawal fee from ask exchange (informational)
-            rc = round(fees.withdrawal_cost_quote(
-                entry["base"], bid, exchange=entry["min_ask_ex"],
-            ), 8)
-        else:
-            net_pf = profit
-            rc = 0.0
+        for sell_t in tickers:          # exchange where we SELL (bid)
+            for buy_t in tickers:       # exchange where we BUY (ask)
+                if sell_t.exchange == buy_t.exchange:
+                    continue
+                if sell_t.bid <= buy_t.ask:
+                    continue
 
-        wf = rc
-        ref_size = arb_config.ref_trade_size if arb_config else 1000.0
-        tnpf = net_pf - (wf / ref_size) * 100 if ref_size > 0 and wf > 0 else net_pf
+                bid = sell_t.bid
+                ask = buy_t.ask
+                profit = (bid - ask) / ask * 100
 
-        now_ms = int(time.time() * 1000)
-        bts = entry["max_bid_ts"]
-        ats = entry["min_ask_ts"]
-        age = max(now_ms - bts, now_ms - ats)
-        msv = min(entry["max_bid_vol"], entry["min_ask_vol"])
+                if min_profit > 0 and profit < min_profit:
+                    continue
 
-        # Transfer feasibility: True=confirmed, False=blocked, None=unknown
-        tf = None
-        if fees:
-            tf = fees.transfer_status(
-                bid_exchange=entry["max_bid_ex"],
-                ask_exchange=entry["min_ask_ex"],
-                symbol=entry["base"],
-            )
+                bid_ex = sell_t.exchange
+                ask_ex = buy_t.exchange
 
-        results.append({
-            "s": entry["symbol"],
-            "b": entry["base"],
-            "q": entry["quote"],
-            "bx": entry["max_bid_ex"],
-            "ax": entry["min_ask_ex"],
-            "bi": round(bid, 8),
-            "ak": round(ask, 8),
-            "pf": round(profit, 4),
-            "npf": round(net_pf, 4),
-            "tnpf": round(tnpf, 4),
-            "wf": wf,
-            "tf": tf,
-            "msv": msv,
-            "bv": entry["max_bid_vol"],
-            "av": entry["min_ask_vol"],
-            "bts": bts,
-            "ats": ats,
-            "age": age,
-        })
+                if fees:
+                    net_pf = fees.net_profit_after_taker(
+                        bid=bid, ask=ask,
+                        bid_exchange=bid_ex, ask_exchange=ask_ex,
+                    )
+                    rc = round(fees.withdrawal_cost_quote(
+                        buy_t.base_asset, bid, exchange=ask_ex,
+                    ), 8)
+                else:
+                    net_pf = profit
+                    rc = 0.0
+
+                wf = rc
+                tnpf = net_pf - (wf / ref_size) * 100 if ref_size > 0 and wf > 0 else net_pf
+
+                bts = int(sell_t.last_update.timestamp() * 1000)
+                ats = int(buy_t.last_update.timestamp() * 1000)
+                age = max(now_ms - bts, now_ms - ats)
+                msv = min(sell_t.volume_quote, buy_t.volume_quote)
+
+                tf = None
+                if fees:
+                    tf = fees.transfer_status(
+                        bid_exchange=bid_ex,
+                        ask_exchange=ask_ex,
+                        symbol=buy_t.base_asset,
+                    )
+
+                results.append({
+                    "s": sell_t.symbol,
+                    "b": sell_t.base_asset,
+                    "q": sell_t.quote_asset,
+                    "bx": bid_ex,
+                    "ax": ask_ex,
+                    "bi": round(bid, 8),
+                    "ak": round(ask, 8),
+                    "pf": round(profit, 4),
+                    "npf": round(net_pf, 4),
+                    "tnpf": round(tnpf, 4),
+                    "wf": wf,
+                    "tf": tf,
+                    "msv": msv,
+                    "bv": sell_t.volume_quote,
+                    "av": buy_t.volume_quote,
+                    "bts": bts,
+                    "ats": ats,
+                    "age": age,
+                })
 
     return results
 
@@ -298,7 +270,10 @@ async def _index_handler(request: web.Request) -> web.Response:
     if not template.exists():
         raise web.HTTPNotFound(text="Template not found")
     html = template.read_text(encoding="utf-8")
-    return web.Response(text=html, content_type="text/html", charset="utf-8")
+    return web.Response(
+        text=html, content_type="text/html", charset="utf-8",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 async def _metrics_handler(request: web.Request) -> web.Response:

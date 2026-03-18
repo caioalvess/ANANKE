@@ -293,9 +293,30 @@ class KrakenExchange(Exchange):
             volume_base = _val(item, "v", 1)
             vwap_24h = _val(item, "p", 1)
             volume_quote = vwap_24h * volume_base
+            rest_bid = _val(item, "b", 0)
+            rest_ask = _val(item, "a", 0)
+            sym = info["symbol"]
 
-            self.tickers[info["symbol"]] = Ticker(
-                symbol=info["symbol"],
+            existing = self.tickers.get(sym)
+            if existing:
+                existing.price = price
+                existing.price_change = price_change
+                existing.price_change_pct = price_change_pct
+                existing.high_24h = _val(item, "h", 1)
+                existing.low_24h = _val(item, "l", 1)
+                existing.volume_base = volume_base
+                existing.volume_quote = volume_quote
+                existing.open_price = open_price
+                existing.trades_count = int(_val(item, "t", 1))
+                if rest_bid > 0:
+                    existing.bid = rest_bid
+                if rest_ask > 0:
+                    existing.ask = rest_ask
+                existing.last_update = now
+                continue
+
+            self.tickers[sym] = Ticker(
+                symbol=sym,
                 base_asset=info["base"],
                 quote_asset=info["quote"],
                 price=price,
@@ -305,8 +326,8 @@ class KrakenExchange(Exchange):
                 low_24h=_val(item, "l", 1),
                 volume_base=volume_base,
                 volume_quote=volume_quote,
-                bid=_val(item, "b", 0),
-                ask=_val(item, "a", 0),
+                bid=rest_bid,
+                ask=rest_ask,
                 open_price=open_price,
                 trades_count=int(_val(item, "t", 1)),
                 last_update=now,

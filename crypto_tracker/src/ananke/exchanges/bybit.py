@@ -180,33 +180,46 @@ class BybitExchange(Exchange):
         price = safe_float(data.get("lastPrice"))
         prev_price = safe_float(data.get("prevPrice24h"))
         pct_raw = safe_float(data.get("price24hPcnt"))
-        bid = safe_float(data.get("bid1Price"))
-        ask = safe_float(data.get("ask1Price"))
+        ws_bid = safe_float(data.get("bid1Price"))
+        ws_ask = safe_float(data.get("ask1Price"))
 
-        # WS may omit bid/ask — preserve values from REST
-        if not bid and existing:
-            bid = existing.bid
-        if not ask and existing:
-            ask = existing.ask
-
-        self.tickers[symbol] = Ticker(
-            symbol=symbol,
-            base_asset=info["base"],
-            quote_asset=info["quote"],
-            price=price,
-            price_change=price - prev_price if prev_price else 0.0,
-            price_change_pct=pct_raw * 100,
-            high_24h=safe_float(data.get("highPrice24h")),
-            low_24h=safe_float(data.get("lowPrice24h")),
-            volume_base=safe_float(data.get("volume24h")),
-            volume_quote=safe_float(data.get("turnover24h")),
-            bid=bid,
-            ask=ask,
-            open_price=prev_price,
-            trades_count=0,
-            last_update=now,
-            exchange=self.name,
-        )
+        if existing:
+            # Update in-place — preserve bid/ask from REST if WS omits them
+            existing.price = price
+            existing.price_change = price - prev_price if prev_price else 0.0
+            existing.price_change_pct = pct_raw * 100
+            h = safe_float(data.get("highPrice24h"))
+            l = safe_float(data.get("lowPrice24h"))
+            vb = safe_float(data.get("volume24h"))
+            vq = safe_float(data.get("turnover24h"))
+            if h > 0: existing.high_24h = h
+            if l > 0: existing.low_24h = l
+            if vb > 0: existing.volume_base = vb
+            if vq > 0: existing.volume_quote = vq
+            if prev_price > 0: existing.open_price = prev_price
+            # Only overwrite bid/ask if WS actually provides them
+            if ws_bid > 0: existing.bid = ws_bid
+            if ws_ask > 0: existing.ask = ws_ask
+            existing.last_update = now
+        else:
+            self.tickers[symbol] = Ticker(
+                symbol=symbol,
+                base_asset=info["base"],
+                quote_asset=info["quote"],
+                price=price,
+                price_change=price - prev_price if prev_price else 0.0,
+                price_change_pct=pct_raw * 100,
+                high_24h=safe_float(data.get("highPrice24h")),
+                low_24h=safe_float(data.get("lowPrice24h")),
+                volume_base=safe_float(data.get("volume24h")),
+                volume_quote=safe_float(data.get("turnover24h")),
+                bid=ws_bid,
+                ask=ws_ask,
+                open_price=prev_price,
+                trades_count=0,
+                last_update=now,
+                exchange=self.name,
+            )
         self._notify()
 
     # --- REST fallback ---
@@ -248,23 +261,43 @@ class BybitExchange(Exchange):
             prev_price = safe_float(item.get("prevPrice24h"))
             pct_raw = safe_float(item.get("price24hPcnt"))
 
-            self.tickers[symbol] = Ticker(
-                symbol=symbol,
-                base_asset=info["base"],
-                quote_asset=info["quote"],
-                price=price,
-                price_change=price - prev_price if prev_price else 0.0,
-                price_change_pct=pct_raw * 100,
-                high_24h=safe_float(item.get("highPrice24h")),
-                low_24h=safe_float(item.get("lowPrice24h")),
-                volume_base=safe_float(item.get("volume24h")),
-                volume_quote=safe_float(item.get("turnover24h")),
-                bid=safe_float(item.get("bid1Price")),
-                ask=safe_float(item.get("ask1Price")),
-                open_price=prev_price,
-                trades_count=0,
-                last_update=now,
-                exchange=self.name,
-            )
+            rest_bid = safe_float(item.get("bid1Price"))
+            rest_ask = safe_float(item.get("ask1Price"))
+
+            existing = self.tickers.get(symbol)
+            if existing:
+                # Update in-place — REST always provides bid/ask
+                existing.price = price
+                existing.price_change = price - prev_price if prev_price else 0.0
+                existing.price_change_pct = pct_raw * 100
+                existing.high_24h = safe_float(item.get("highPrice24h"))
+                existing.low_24h = safe_float(item.get("lowPrice24h"))
+                existing.volume_base = safe_float(item.get("volume24h"))
+                existing.volume_quote = safe_float(item.get("turnover24h"))
+                existing.open_price = prev_price
+                if rest_bid > 0:
+                    existing.bid = rest_bid
+                if rest_ask > 0:
+                    existing.ask = rest_ask
+                existing.last_update = now
+            else:
+                self.tickers[symbol] = Ticker(
+                    symbol=symbol,
+                    base_asset=info["base"],
+                    quote_asset=info["quote"],
+                    price=price,
+                    price_change=price - prev_price if prev_price else 0.0,
+                    price_change_pct=pct_raw * 100,
+                    high_24h=safe_float(item.get("highPrice24h")),
+                    low_24h=safe_float(item.get("lowPrice24h")),
+                    volume_base=safe_float(item.get("volume24h")),
+                    volume_quote=safe_float(item.get("turnover24h")),
+                    bid=rest_bid,
+                    ask=rest_ask,
+                    open_price=prev_price,
+                    trades_count=0,
+                    last_update=now,
+                    exchange=self.name,
+                )
 
         self._notify()

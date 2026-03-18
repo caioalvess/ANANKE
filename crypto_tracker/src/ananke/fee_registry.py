@@ -162,11 +162,17 @@ class FeeRegistry:
         bid_has_data = bid_exchange in self._status_exchanges
 
         if not ask_has_data or not bid_has_data:
-            # Can't confirm — check if the side WITH data shows a block
+            # Partial data — check what we know
             if ask_has_data and (ask_exchange, upper) in self._withdraw_blocked:
                 return False
             if bid_has_data and (bid_exchange, upper) in self._deposit_blocked:
                 return False
+            # If the side that HAS data confirms it's OK, treat as likely OK
+            # (better than showing "unknown" when withdrawal is confirmed)
+            if ask_has_data and (ask_exchange, upper) not in self._withdraw_blocked:
+                return True  # withdrawal confirmed, deposit assumed OK
+            if bid_has_data and (bid_exchange, upper) not in self._deposit_blocked:
+                return True  # deposit confirmed, withdrawal assumed OK
             return None
 
         # Both sides have data

@@ -293,23 +293,43 @@ class KucoinExchange(Exchange):
             change_price = safe_float(item.get("changePrice"))
             change_rate = safe_float(item.get("changeRate"))
 
-            self.tickers[symbol] = Ticker(
-                symbol=symbol,
-                base_asset=info["base"],
-                quote_asset=info["quote"],
-                price=price,
-                price_change=change_price,
-                price_change_pct=change_rate * 100,
-                high_24h=safe_float(item.get("high")),
-                low_24h=safe_float(item.get("low")),
-                volume_base=safe_float(item.get("vol")),
-                volume_quote=safe_float(item.get("volValue")),
-                bid=safe_float(item.get("buy")),
-                ask=safe_float(item.get("sell")),
-                open_price=safe_float(item.get("open")),
-                trades_count=0,
-                last_update=now,
-                exchange=self.name,
-            )
+            existing = self.tickers.get(symbol)
+            rest_bid = safe_float(item.get("buy"))
+            rest_ask = safe_float(item.get("sell"))
+
+            if existing:
+                existing.price = price
+                existing.price_change = change_price
+                existing.price_change_pct = change_rate * 100
+                existing.high_24h = safe_float(item.get("high"))
+                existing.low_24h = safe_float(item.get("low"))
+                existing.volume_base = safe_float(item.get("vol"))
+                existing.volume_quote = safe_float(item.get("volValue"))
+                existing.open_price = safe_float(item.get("open"))
+                # KuCoin REST always provides bid/ask — use them
+                if rest_bid > 0:
+                    existing.bid = rest_bid
+                if rest_ask > 0:
+                    existing.ask = rest_ask
+                existing.last_update = now
+            else:
+                self.tickers[symbol] = Ticker(
+                    symbol=symbol,
+                    base_asset=info["base"],
+                    quote_asset=info["quote"],
+                    price=price,
+                    price_change=change_price,
+                    price_change_pct=change_rate * 100,
+                    high_24h=safe_float(item.get("high")),
+                    low_24h=safe_float(item.get("low")),
+                    volume_base=safe_float(item.get("vol")),
+                    volume_quote=safe_float(item.get("volValue")),
+                    bid=rest_bid,
+                    ask=rest_ask,
+                    open_price=safe_float(item.get("open")),
+                    trades_count=0,
+                    last_update=now,
+                    exchange=self.name,
+                )
 
         self._notify()
