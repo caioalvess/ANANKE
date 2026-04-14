@@ -212,6 +212,9 @@ class KucoinExchange(Exchange):
 
         WS lacks: high, low, vol, volValue, changePrice, changeRate.
         These are preserved from existing ticker (populated by REST).
+
+        Preserves existing bid/ask when WS omits or zeros them, so REST
+        fallback values aren't wiped by a partial push.
         """
         topic = msg.get("topic", "")
         # Extract symbol from topic: /market/ticker:BTC-USDT → BTC-USDT
@@ -227,25 +230,37 @@ class KucoinExchange(Exchange):
         existing = self.tickers.get(symbol)
 
         price = safe_float(data.get("price"))
-        bid = safe_float(data.get("bestBid"))
-        ask = safe_float(data.get("bestAsk"))
+        ws_bid = safe_float(data.get("bestBid"))
+        ws_ask = safe_float(data.get("bestAsk"))
+        now = datetime.now()
+
+        if existing:
+            if price > 0:
+                existing.price = price
+            if ws_bid > 0:
+                existing.bid = ws_bid
+            if ws_ask > 0:
+                existing.ask = ws_ask
+            existing.last_update = now
+            self._notify()
+            return
 
         self.tickers[symbol] = Ticker(
             symbol=symbol,
             base_asset=info["base"],
             quote_asset=info["quote"],
             price=price,
-            price_change=existing.price_change if existing else 0.0,
-            price_change_pct=existing.price_change_pct if existing else 0.0,
-            high_24h=existing.high_24h if existing else 0.0,
-            low_24h=existing.low_24h if existing else 0.0,
-            volume_base=existing.volume_base if existing else 0.0,
-            volume_quote=existing.volume_quote if existing else 0.0,
-            bid=bid,
-            ask=ask,
-            open_price=existing.open_price if existing else 0.0,
+            price_change=0.0,
+            price_change_pct=0.0,
+            high_24h=0.0,
+            low_24h=0.0,
+            volume_base=0.0,
+            volume_quote=0.0,
+            bid=ws_bid,
+            ask=ws_ask,
+            open_price=0.0,
             trades_count=0,
-            last_update=datetime.now(),
+            last_update=now,
             exchange=self.name,
         )
         self._notify()

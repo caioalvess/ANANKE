@@ -11,6 +11,18 @@ from dataclasses import dataclass, field
 
 _BUFFER_SIZE = 3600  # 60 min × 60 slots/min
 _WINDOW_5M = 300     # 5 minutes in seconds
+_WINDOW_60S = 60     # 60 seconds for per-exchange sparklines
+_EXPIRED_BUFFER = 2000  # last N expired durations kept for lifespan histogram
+
+# Lifespan buckets in seconds — matches the 6 categories shown in the UI
+_LIFESPAN_BUCKETS: tuple[tuple[str, float, float], ...] = (
+    ("<5s",    0.0,     5.0),
+    ("5-15s",  5.0,    15.0),
+    ("15-30s", 15.0,   30.0),
+    ("30-60s", 30.0,   60.0),
+    ("1-5m",   60.0,  300.0),
+    ("5m+",   300.0, float("inf")),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +67,9 @@ class MetricsCollector:
         self._active_since: dict[str, float] = {}  # key → first-seen monotonic
         self._peak_count: int = 0
         self._prev_count: int = 0
+        # (expired_at, duration_sec) pairs for the lifespan histogram.
+        # Ring buffer keeps only recent expirations so old data evicts naturally.
+        self._expired: deque[tuple[float, float]] = deque(maxlen=_EXPIRED_BUFFER)
 
     def record(self, arb_results: list[dict]) -> None:
         """Record a snapshot of currently active opportunities.
@@ -76,9 +91,13 @@ class MetricsCollector:
             if key not in self._active_since:
                 self._active_since[key] = now
 
-        # Remove keys that are no longer active
+        # Remove keys that are no longer active — capture their duration
+        # for the lifespan histogram before we forget the start timestamp.
         gone = set(self._active_since) - current_keys
         for k in gone:
+            duration = now - self._active_since[k]
+            if duration >= 0:
+                self._expired.append((now, duration))
             del self._active_since[k]
 
         self._prev_count = len(self._buffer[-1].opps) if self._buffer else 0
@@ -224,6 +243,100 @@ class MetricsCollector:
 
         return buckets
 
+    def get_lifespan_histogram(
+        self, window_sec: float = _WINDOW_5M,
+    ) -> list[dict]:
+        """Histogram of expired opportunity durations.
+
+        Counts only expirations that happened within the last `window_sec`.
+        Returns the 6 fixed buckets defined in `_LIFESPAN_BUCKETS`.
+        """
+        if not self._buffer:
+            return [{"label": b[0], "count": 0} for b in _LIFESPAN_BUCKETS]
+
+        now = self._buffer[-1].ts
+        cutoff = now - window_sec
+        counts = [0] * len(_LIFESPAN_BUCKETS)
+
+        for expired_at, duration in self._expired:
+            if expired_at < cutoff:
+                continue
+            for i, (_, lo, hi) in enumerate(_LIFESPAN_BUCKETS):
+                if lo <= duration < hi:
+                    counts[i] += 1
+                    break
+
+        return [
+            {"label": _LIFESPAN_BUCKETS[i][0], "count": counts[i]}
+            for i in range(len(_LIFESPAN_BUCKETS))
+        ]
+
+    def get_exchange_matrix(
+        self, window_sec: float = _WINDOW_5M,
+    ) -> dict[str, dict[str, int]]:
+        """Cross-exchange frequency matrix over the window.
+
+        Returns {sell_exchange: {buy_exchange: total_occurrences}} aggregated
+        from the per-pair stats.  Useful for rendering a heatmap of which
+        exchange combinations are the most productive cross-exchange routes.
+        """
+        stats = self.get_pair_stats(window_sec)
+        matrix: dict[str, dict[str, int]] = {}
+        for key, s in stats.items():
+            label = _opp_label(key)
+            sell_ex = label["bx"]
+            buy_ex = label["ax"]
+            if not sell_ex or not buy_ex:
+                continue
+            matrix.setdefault(sell_ex, {})
+            matrix[sell_ex][buy_ex] = matrix[sell_ex].get(buy_ex, 0) + s["count"]
+        return matrix
+
+    def get_per_exchange_series(
+        self,
+        window_sec: float = _WINDOW_60S,
+        bucket_sec: float = 5.0,
+    ) -> dict[str, list[int]]:
+        """Time-series of opportunity count per exchange.
+
+        For each exchange, returns a list of counts — one entry per
+        `bucket_sec` bucket within the last `window_sec` window.  An
+        opportunity counts toward both its buy-side and sell-side exchange.
+
+        Used for the per-exchange sparklines on the metrics view.
+        """
+        entries = self._window_entries(window_sec)
+        n_buckets = max(1, int(window_sec / bucket_sec))
+        if not entries:
+            return {}
+
+        now = entries[-1].ts
+
+        series: dict[str, list[int]] = {}
+
+        for entry in entries:
+            # Map entry timestamp to bucket index (0 = oldest, n-1 = newest)
+            delta = now - entry.ts
+            idx = n_buckets - 1 - int(delta / bucket_sec)
+            if idx < 0 or idx >= n_buckets:
+                continue
+            # For each opportunity in this entry, credit both exchanges once.
+            seen_this_entry: set[tuple[str, str]] = set()
+            for snap in entry.opps:
+                label = _opp_label(snap.key)
+                for ex in (label["ax"], label["bx"]):
+                    if not ex:
+                        continue
+                    marker = (ex, snap.key)
+                    if marker in seen_this_entry:
+                        continue
+                    seen_this_entry.add(marker)
+                    if ex not in series:
+                        series[ex] = [0] * n_buckets
+                    series[ex][idx] += 1
+
+        return series
+
     def get_metrics(self, window_sec: float = _WINDOW_5M) -> dict:
         """Compute global + top-pair metrics.
 
@@ -308,6 +421,9 @@ class MetricsCollector:
             "buffer_sec": round(buffer_sec, 1),
             "history": self.get_history(window_sec),
             "spread_dist": self.get_spread_distribution(),
+            "lifespan_hist": self.get_lifespan_histogram(window_sec),
+            "exchange_matrix": self.get_exchange_matrix(window_sec),
+            "per_exchange_series": self.get_per_exchange_series(),
         }
 
     def enrich_arb_results(self, results: list[dict]) -> None:

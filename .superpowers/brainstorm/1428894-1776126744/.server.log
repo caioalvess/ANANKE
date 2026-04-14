@@ -1,0 +1,12 @@
+{"type":"server-started","port":54652,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:54652","screen_dir":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744"}
+{"type":"screen-added","file":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744/direction.html"}
+{"type":"screen-added","file":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744/waiting.html"}
+{"type":"screen-added","file":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744/themes-5.html"}
+{"type":"screen-added","file":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744/themes-more.html"}
+{"type":"screen-added","file":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744/implementing.html"}
+{"type":"screen-added","file":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744/metrics-layout.html"}
+{"type":"screen-added","file":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744/metrics-layout-v2.html"}
+{"type":"screen-added","file":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744/metrics-layout-v3.html"}
+{"type":"screen-added","file":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744/metrics-layout-v4.html"}
+{"type":"screen-added","file":"/dados/ANANKE/.superpowers/brainstorm/1428894-1776126744/metrics-layout-v5.html"}
+{"type":"server-stopped","reason":"idle timeout"}

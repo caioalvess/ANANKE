@@ -1,0 +1,190 @@
+<style>
+  .dir-mockup {
+    padding: 14px 16px;
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 10px;
+    line-height: 1.7;
+    min-height: 220px;
+  }
+  .dir-mockup .dm-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+  }
+  .dir-mockup table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .dir-mockup th {
+    font-size: 8.5px;
+    font-weight: 600;
+    text-align: right;
+    padding: 3px 5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .dir-mockup th:first-child, .dir-mockup th.l { text-align: left; }
+  .dir-mockup td {
+    padding: 3px 5px;
+    text-align: right;
+    font-size: 10px;
+  }
+  .dir-mockup td:first-child, .dir-mockup td.l { text-align: left; }
+
+  /* --- A: Terminal Refinado --- */
+  .dir-a { background: #060606; color: #5fa871; }
+  .dir-a .dm-header { color: #3a7048; letter-spacing: 3px; border-bottom: 1px solid #152015; }
+  .dir-a th { color: #3a7048; border-bottom: 1px solid #152015; font-weight: 500; }
+  .dir-a td { color: #5fa871; }
+  .dir-a .pair-b { color: #d0e8d4; }
+  .dir-a .pair-q { color: #2a4030; }
+  .dir-a .pos { color: #8be8a0; }
+  .dir-a tr { border-bottom: 1px solid #0a100a; }
+
+  /* --- B: Bloomberg Pro --- */
+  .dir-b { background: #0b0a05; color: #ffb000; }
+  .dir-b .dm-header { color: #a07500; letter-spacing: 2px; border-bottom: 1px solid #2a1e00; }
+  .dir-b th { color: #a07500; border-bottom: 1px solid #2a1e00; background: #110d00; }
+  .dir-b td { color: #ffb000; font-weight: 500; }
+  .dir-b .pair-b { color: #ffffff; font-weight: 600; }
+  .dir-b .pair-q { color: #5a4000; }
+  .dir-b .pos { color: #41ff6b; }
+  .dir-b tr:nth-child(even) td { background: #0e0c04; }
+  .dir-b tr { border-bottom: 1px solid #1a1400; }
+
+  /* --- C: Modern Dark --- */
+  .dir-c { background: #0e1217; color: #b8c4cc; font-family: 'Inter', 'Fira Code', monospace; }
+  .dir-c .dm-header { color: #5a6875; letter-spacing: 1.5px; border-bottom: 1px solid #1a2028; font-weight: 600; }
+  .dir-c th { color: #5a6875; border-bottom: 1px solid #1a2028; font-weight: 600; letter-spacing: 0.5px; }
+  .dir-c td { color: #b8c4cc; padding: 6px 5px; }
+  .dir-c .pair-b { color: #e8eef2; font-weight: 600; }
+  .dir-c .pair-q { color: #4a5560; }
+  .dir-c .pos { color: #00c853; font-weight: 600; }
+  .dir-c tr { border-bottom: 1px solid #151a21; }
+
+  /* --- D: Pure CLI --- */
+  .dir-d { background: #000000; color: #00b530; padding: 16px 12px; }
+  .dir-d .dm-header { color: #00801d; letter-spacing: 1px; padding-bottom: 4px; margin-bottom: 6px; text-transform: none; }
+  .dir-d th { color: #00801d; padding: 1px 6px; font-weight: 400; text-transform: none; font-size: 9px; }
+  .dir-d td { color: #00b530; padding: 1px 6px; font-size: 10px; }
+  .dir-d .pair-b { color: #7fff7f; }
+  .dir-d .pair-q { color: #004010; }
+  .dir-d .pos { color: #40ff40; }
+
+  /* --- E: Monokai --- */
+  .dir-e { background: #272822; color: #f8f8f2; }
+  .dir-e .dm-header { color: #75715e; letter-spacing: 2px; border-bottom: 1px solid #3e3d32; }
+  .dir-e th { color: #66d9ef; border-bottom: 1px solid #3e3d32; font-weight: 600; }
+  .dir-e td { color: #f8f8f2; }
+  .dir-e .pair-b { color: #f8f8f2; font-weight: 600; }
+  .dir-e .pair-q { color: #75715e; }
+  .dir-e .pos { color: #a6e22e; }
+  .dir-e tr:nth-child(even) td { background: #2d2e27; }
+  .dir-e tr { border-bottom: 1px solid #1e1f1a; }
+  .dir-e .orange { color: #fd971f; }
+</style>
+
+<h2>Os 5 temas disponíveis</h2>
+<p class="subtitle">Modern Dark (C) é o padrão ao abrir pela primeira vez. Clica pra trocar entre os 5 depois, via dropdown no header. Abaixo, o Monokai novo que eu acabei de montar — valida se a paleta tá boa.</p>
+
+<div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(340px,1fr))">
+
+  <div class="card" data-choice="refined">
+    <div class="card-image" style="padding:0">
+      <div class="dir-mockup dir-a">
+        <div class="dm-header"><span>ANANKE // ARBITRAGE</span><span>● LIVE</span></div>
+        <table>
+          <tr><th class="l">#</th><th class="l">PAIR</th><th>BUY</th><th>@</th><th>SELL</th><th>@</th><th>PF</th></tr>
+          <tr><td>01</td><td class="l"><span class="pair-b">BTC</span><span class="pair-q">/USDT</span></td><td>98,432.10</td><td>Binance</td><td>98,441.50</td><td>Bybit</td><td class="pos">+0.095%</td></tr>
+          <tr><td>02</td><td class="l"><span class="pair-b">ETH</span><span class="pair-q">/USDT</span></td><td>3,201.50</td><td>OKX</td><td>3,203.10</td><td>Kraken</td><td class="pos">+0.050%</td></tr>
+          <tr><td>03</td><td class="l"><span class="pair-b">SOL</span><span class="pair-q">/USDT</span></td><td>151.20</td><td>KuCoin</td><td>151.40</td><td>Gate.io</td><td class="pos">+0.132%</td></tr>
+          <tr><td>04</td><td class="l"><span class="pair-b">ARB</span><span class="pair-q">/USDT</span></td><td>0.7812</td><td>Bybit</td><td>0.7825</td><td>Binance</td><td class="pos">+0.166%</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A) Terminal Refinado</h3>
+      <p>Verde mate, sem glow nem scanline.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="bloomberg">
+    <div class="card-image" style="padding:0">
+      <div class="dir-mockup dir-b">
+        <div class="dm-header"><span>ANANKE // ARBITRAGE</span><span>● LIVE</span></div>
+        <table>
+          <tr><th class="l">#</th><th class="l">PAIR</th><th>BUY</th><th>@</th><th>SELL</th><th>@</th><th>PF</th></tr>
+          <tr><td>01</td><td class="l"><span class="pair-b">BTC</span><span class="pair-q">/USDT</span></td><td>98,432.10</td><td>Binance</td><td>98,441.50</td><td>Bybit</td><td class="pos">+0.095%</td></tr>
+          <tr><td>02</td><td class="l"><span class="pair-b">ETH</span><span class="pair-q">/USDT</span></td><td>3,201.50</td><td>OKX</td><td>3,203.10</td><td>Kraken</td><td class="pos">+0.050%</td></tr>
+          <tr><td>03</td><td class="l"><span class="pair-b">SOL</span><span class="pair-q">/USDT</span></td><td>151.20</td><td>KuCoin</td><td>151.40</td><td>Gate.io</td><td class="pos">+0.132%</td></tr>
+          <tr><td>04</td><td class="l"><span class="pair-b">ARB</span><span class="pair-q">/USDT</span></td><td>0.7812</td><td>Bybit</td><td>0.7825</td><td>Binance</td><td class="pos">+0.166%</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B) Bloomberg Terminal</h3>
+      <p>Âmbar/verde pro feel de desk profissional.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="modern">
+    <div class="card-image" style="padding:0">
+      <div class="dir-mockup dir-c">
+        <div class="dm-header"><span>ANANKE / Arbitrage</span><span>● Live</span></div>
+        <table>
+          <tr><th class="l">#</th><th class="l">Pair</th><th>Buy</th><th>@</th><th>Sell</th><th>@</th><th>Profit</th></tr>
+          <tr><td>01</td><td class="l"><span class="pair-b">BTC</span><span class="pair-q">/USDT</span></td><td>98,432.10</td><td>Binance</td><td>98,441.50</td><td>Bybit</td><td class="pos">+0.095%</td></tr>
+          <tr><td>02</td><td class="l"><span class="pair-b">ETH</span><span class="pair-q">/USDT</span></td><td>3,201.50</td><td>OKX</td><td>3,203.10</td><td>Kraken</td><td class="pos">+0.050%</td></tr>
+          <tr><td>03</td><td class="l"><span class="pair-b">SOL</span><span class="pair-q">/USDT</span></td><td>151.20</td><td>KuCoin</td><td>151.40</td><td>Gate.io</td><td class="pos">+0.132%</td></tr>
+          <tr><td>04</td><td class="l"><span class="pair-b">ARB</span><span class="pair-q">/USDT</span></td><td>0.7812</td><td>Bybit</td><td>0.7825</td><td>Binance</td><td class="pos">+0.166%</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C) Modern Dark — <em>default</em></h3>
+      <p>Azul-petróleo moderno, sans-serif no header.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="cli">
+    <div class="card-image" style="padding:0">
+      <div class="dir-mockup dir-d">
+        <div class="dm-header">ananke :: arbitrage :: live</div>
+        <table>
+          <tr><th class="l">#</th><th class="l">pair</th><th>buy</th><th>@</th><th>sell</th><th>@</th><th>pf</th></tr>
+          <tr><td>01</td><td class="l"><span class="pair-b">BTC</span><span class="pair-q">/USDT</span></td><td>98432.10</td><td>binance</td><td>98441.50</td><td>bybit</td><td class="pos">+0.095%</td></tr>
+          <tr><td>02</td><td class="l"><span class="pair-b">ETH</span><span class="pair-q">/USDT</span></td><td>3201.50</td><td>okx</td><td>3203.10</td><td>kraken</td><td class="pos">+0.050%</td></tr>
+          <tr><td>03</td><td class="l"><span class="pair-b">SOL</span><span class="pair-q">/USDT</span></td><td>151.20</td><td>kucoin</td><td>151.40</td><td>gate.io</td><td class="pos">+0.132%</td></tr>
+          <tr><td>04</td><td class="l"><span class="pair-b">ARB</span><span class="pair-q">/USDT</span></td><td>0.7812</td><td>bybit</td><td>0.7825</td><td>binance</td><td class="pos">+0.166%</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>D) Pure CLI / htop</h3>
+      <p>Puro texto, sem borda, htop-like.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="monokai" style="border-color:#fd971f">
+    <div class="card-image" style="padding:0">
+      <div class="dir-mockup dir-e">
+        <div class="dm-header"><span>ANANKE // ARBITRAGE</span><span class="orange">● LIVE</span></div>
+        <table>
+          <tr><th class="l">#</th><th class="l">PAIR</th><th>BUY</th><th>@</th><th>SELL</th><th>@</th><th>PF</th></tr>
+          <tr><td>01</td><td class="l"><span class="pair-b">BTC</span><span class="pair-q">/USDT</span></td><td>98,432.10</td><td>Binance</td><td>98,441.50</td><td>Bybit</td><td class="pos">+0.095%</td></tr>
+          <tr><td>02</td><td class="l"><span class="pair-b">ETH</span><span class="pair-q">/USDT</span></td><td>3,201.50</td><td>OKX</td><td>3,203.10</td><td>Kraken</td><td class="pos">+0.050%</td></tr>
+          <tr><td>03</td><td class="l"><span class="pair-b">SOL</span><span class="pair-q">/USDT</span></td><td>151.20</td><td>KuCoin</td><td>151.40</td><td>Gate.io</td><td class="pos">+0.132%</td></tr>
+          <tr><td>04</td><td class="l"><span class="pair-b">ARB</span><span class="pair-q">/USDT</span></td><td>0.7812</td><td>Bybit</td><td>0.7825</td><td>Binance</td><td class="pos">+0.166%</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>E) Monokai <em>(novo)</em></h3>
+      <p>Paleta clássica de editor: bg #272822, texto #f8f8f2, headers #66d9ef (ciano), positivo #a6e22e (verde lima), acento #fd971f (laranja), dim #75715e. Vibe de código-fonte.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px">O Monokai bate com o que você esperava? Se sim, fecho o design e escrevo o spec. Se quiser ajustar cor específica, me fala.</p>

@@ -209,6 +209,9 @@ class KrakenExchange(Exchange):
 
         Each item has: symbol (wsname like "BTC/USD"), bid, ask, last,
         volume, vwap, high, low, change, change_pct.
+
+        Preserves existing bid/ask when WS omits or zeros them, so REST
+        fallback values aren't wiped by a partial push.
         """
         now = datetime.now()
         for item in data:
@@ -227,9 +230,29 @@ class KrakenExchange(Exchange):
             vwap = safe_float(item.get("vwap"))
             volume_quote = vwap * volume_base if vwap else 0.0
             open_price = price - change if change else 0.0
+            ws_bid = safe_float(item.get("bid"))
+            ws_ask = safe_float(item.get("ask"))
+            sym = info["symbol"]
 
-            self.tickers[info["symbol"]] = Ticker(
-                symbol=info["symbol"],
+            existing = self.tickers.get(sym)
+            if existing:
+                existing.price = price
+                existing.price_change = change
+                existing.price_change_pct = change_pct
+                existing.high_24h = safe_float(item.get("high"))
+                existing.low_24h = safe_float(item.get("low"))
+                existing.volume_base = volume_base
+                existing.volume_quote = volume_quote
+                existing.open_price = open_price
+                if ws_bid > 0:
+                    existing.bid = ws_bid
+                if ws_ask > 0:
+                    existing.ask = ws_ask
+                existing.last_update = now
+                continue
+
+            self.tickers[sym] = Ticker(
+                symbol=sym,
                 base_asset=info["base"],
                 quote_asset=info["quote"],
                 price=price,
@@ -239,8 +262,8 @@ class KrakenExchange(Exchange):
                 low_24h=safe_float(item.get("low")),
                 volume_base=volume_base,
                 volume_quote=volume_quote,
-                bid=safe_float(item.get("bid")),
-                ask=safe_float(item.get("ask")),
+                bid=ws_bid,
+                ask=ws_ask,
                 open_price=open_price,
                 trades_count=0,
                 last_update=now,

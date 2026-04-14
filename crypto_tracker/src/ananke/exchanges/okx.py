@@ -147,7 +147,11 @@ class OkxExchange(Exchange):
         )
 
     def _process_ws_tickers(self, data: list[dict[str, str]]) -> None:
-        """Parse OKX WebSocket ticker push."""
+        """Parse OKX WebSocket ticker push.
+
+        Preserves existing bid/ask when WS omits or zeros them, so REST
+        fallback values aren't wiped by a partial push.
+        """
         now = datetime.now()
         for item in data:
             inst_id = item.get("instId", "")
@@ -160,6 +164,25 @@ class OkxExchange(Exchange):
             open_24h = safe_float(item.get("open24h"))
             price_change = price - open_24h if open_24h else 0.0
             price_change_pct = (price_change / open_24h * 100) if open_24h else 0.0
+            ws_bid = safe_float(item.get("bidPx"))
+            ws_ask = safe_float(item.get("askPx"))
+
+            existing = self.tickers.get(symbol)
+            if existing:
+                existing.price = price
+                existing.price_change = price_change
+                existing.price_change_pct = price_change_pct
+                existing.high_24h = safe_float(item.get("high24h"))
+                existing.low_24h = safe_float(item.get("low24h"))
+                existing.volume_base = safe_float(item.get("vol24h"))
+                existing.volume_quote = safe_float(item.get("volCcy24h"))
+                existing.open_price = open_24h
+                if ws_bid > 0:
+                    existing.bid = ws_bid
+                if ws_ask > 0:
+                    existing.ask = ws_ask
+                existing.last_update = now
+                continue
 
             self.tickers[symbol] = Ticker(
                 symbol=symbol,
@@ -172,8 +195,8 @@ class OkxExchange(Exchange):
                 low_24h=safe_float(item.get("low24h")),
                 volume_base=safe_float(item.get("vol24h")),
                 volume_quote=safe_float(item.get("volCcy24h")),
-                bid=safe_float(item.get("bidPx")),
-                ask=safe_float(item.get("askPx")),
+                bid=ws_bid,
+                ask=ws_ask,
                 open_price=open_24h,
                 trades_count=0,
                 last_update=now,

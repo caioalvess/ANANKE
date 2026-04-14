@@ -213,6 +213,8 @@ class GateioExchange(Exchange):
 
         Fields: s=pair, b=best_bid, B=bid_size, a=best_ask, A=ask_size.
         Updates only bid/ask on the existing ticker.
+
+        Preserves existing bid/ask when the push omits or zeros a side.
         """
         pair_id = data.get("s", "")
         info = self._symbol_info.get(pair_id)
@@ -222,27 +224,15 @@ class GateioExchange(Exchange):
         symbol = pair_id.replace("_", "")
         bid = safe_float(data.get("b"))
         ask = safe_float(data.get("a"))
+        now = datetime.now()
 
         existing = self.tickers.get(symbol)
         if existing:
-            self.tickers[symbol] = Ticker(
-                symbol=existing.symbol,
-                base_asset=existing.base_asset,
-                quote_asset=existing.quote_asset,
-                price=existing.price,
-                price_change=existing.price_change,
-                price_change_pct=existing.price_change_pct,
-                high_24h=existing.high_24h,
-                low_24h=existing.low_24h,
-                volume_base=existing.volume_base,
-                volume_quote=existing.volume_quote,
-                bid=bid,
-                ask=ask,
-                open_price=existing.open_price,
-                trades_count=existing.trades_count,
-                last_update=datetime.now(),
-                exchange=self.name,
-            )
+            if bid > 0:
+                existing.bid = bid
+            if ask > 0:
+                existing.ask = ask
+            existing.last_update = now
         else:
             self.tickers[symbol] = Ticker(
                 symbol=symbol,
@@ -259,7 +249,7 @@ class GateioExchange(Exchange):
                 ask=ask,
                 open_price=0.0,
                 trades_count=0,
-                last_update=datetime.now(),
+                last_update=now,
                 exchange=self.name,
             )
         self._notify()

@@ -34,3 +34,18 @@ OSError: [Errno 98] error while attempting to bind on address ('0.0.0.0', 8080):
   [OKX] OK — 1062 spot symbols loaded
   [Binance] OK — 1441 spot symbols loaded
   [Gate.io] OK — 2064 spot symbols loaded
+2026-04-13 19:24:28,374 [ananke.exchanges.gateio] WARNING: Gate.io WS disconnected (1/3): sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-04-13 19:31:29,070 [ananke.exchanges.gateio] WARNING: Gate.io WS disconnected (1/3): sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-04-13 20:02:30,846 [ananke.exchanges.gateio] WARNING: Gate.io WS disconnected (1/3): sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-04-13 21:06:12,913 [ananke.exchanges.gateio] WARNING: Gate.io WS disconnected (1/3): sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-04-13 21:10:25,530 [ananke.exchanges.gateio] WARNING: Gate.io WS disconnected (1/3): sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-04-13 23:18:38,665 [ananke.exchanges.okx] WARNING: OKX WS disconnected (1/3): sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-04-13 23:18:51,667 [ananke.exchanges.okx] WARNING: OKX WS disconnected (2/3): timed out during opening handshake — reconnecting in 6s
+2026-04-13 23:19:07,669 [ananke.exchanges.okx] WARNING: OKX WS disconnected (3/3): timed out during opening handshake — reconnecting in 9s
+2026-04-13 23:19:26,670 [ananke.exchanges.okx] WARNING: OKX WS disconnected (4/3): timed out during opening handshake — reconnecting in 12s
+2026-04-14 00:03:49,138 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-04-14 00:03:50,272 [ananke.exchanges.okx] WARNING: OKX WS disconnected (1/3): sent 1011 (internal error) keepalive ping timeout; no close frame received — reconnecting in 3s
+2026-04-14 02:33:01,688 [ananke.exchanges.okx] WARNING: OKX WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-04-14 04:15:41,962 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-04-14 05:00:37,861 [ananke.exchanges.kraken] WARNING: Kraken WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
+2026-04-14 06:22:20,734 [ananke.exchanges.okx] WARNING: OKX WS disconnected (1/3): no close frame received or sent — reconnecting in 3s
